@@ -1,6 +1,6 @@
 name: Test and deploy Impossibru!
 on:
-  push: {branches: [main]}
+  push: {branches: [master]}
   pull_request:
 permissions:
   contents: read
