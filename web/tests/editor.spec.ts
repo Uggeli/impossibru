@@ -1,0 +1,2 @@
+import {test,expect} from '@playwright/test';
+test('welcome opens a fully local project',async({page})=>{await page.goto('/');await expect(page.getByRole('heading',{name:'Impossibru!'})).toBeVisible();await page.getByRole('button',{name:'New project',exact:true}).last().click();await expect(page.getByRole('button',{name:'Parts'})).toBeVisible();await expect(page.getByText('Browser project')).toBeVisible()});

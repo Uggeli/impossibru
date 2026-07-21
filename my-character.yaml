@@ -1,0 +1,58 @@
+palette:
+  x: '#66D9A3'
+parts:
+  part:
+    pivot:
+    - 1.5
+    - 0
+    - 1.5
+    front: |-
+      ....
+      ....
+      .xx.
+      .xx.
+    back: |-
+      ....
+      ....
+      .xx.
+      .xx.
+    side: |-
+      ....
+      ....
+      .xx.
+      .xx.
+rig:
+  bones:
+    root:
+      part: part
+  ik_chains: {}
+animations:
+  idle:
+    frames: 8
+    fps: 10
+    loop: true
+    bones: {}
+    ik: {}
+export:
+  name: my-character
+  size:
+  - 96
+  - 96
+  scale: 3
+  origin:
+  - 48
+  - 88
+  directions:
+  - 0
+  - 45
+  - 90
+  - 135
+  - 180
+  - 225
+  - 270
+  - 315
+  background:
+  - 0
+  - 0
+  - 0
+  - 0

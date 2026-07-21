@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ascii-spritebuilder"
+version = "0.1.0"
+description = "Impossibru! — build directional voxel spritesheets from ASCII parts and skeletal keyframes"
+requires-python = ">=3.9"
+dependencies = ["numpy>=1.23", "Pillow>=9", "PyYAML>=6"]
+
+[project.scripts]
+spritebuilder = "spritebuilder.cli:main"
+impossibru = "spritebuilder.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["spritebuilder*"]
+
+[tool.setuptools.package-data]
+spritebuilder = ["editor_static/*", "editor_static/assets/*"]

@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Impossibru! — Sprite Builder</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header>
+    <div><span class="logo">◆</span> <strong>Impossibru!</strong><span class="hidden">Sprite Builder</span><span id="filePath"></span></div>
+    <nav class="workspace-tabs"><button data-workspace="parts" class="active">Parts</button><button data-workspace="rig">Rig</button><button data-workspace="animate">Animate</button></nav>
+    <div class="header-actions"><span id="status">Loading…</span><button id="newProjectButton">New project</button><button id="saveButton" disabled>Save</button></div>
+  </header>
+  <main>
+    <aside class="parts-panel panel" data-pane="parts">
+      <div class="panel-title"><span>Parts</span><button id="addPart" title="Add part">+</button></div>
+      <div id="partList"></div>
+      <div class="part-actions">
+        <button id="duplicatePart">Duplicate</button><button id="renamePart">Rename</button><button id="deletePart" class="danger">Delete</button>
+      </div>
+      <section class="resize-box">
+        <h3>Dimensions</h3>
+        <label>Width <input id="partWidth" type="number" min="1" max="64"></label>
+        <label>Height <input id="partHeight" type="number" min="1" max="64"></label>
+        <label>Depth <input id="partDepth" type="number" min="1" max="64"></label>
+        <button id="resizePart">Resize bottom-center</button>
+      </section>
+    </aside>
+
+    <section class="workspace" data-pane="parts">
+      <div class="toolbar panel">
+        <div id="tools">
+          <button data-tool="pencil" class="active">Pencil <kbd>P</kbd></button>
+          <button data-tool="eraser">Erase <kbd>E</kbd></button>
+          <button data-tool="fill">Fill <kbd>F</kbd></button>
+          <button data-tool="eyedropper">Pick <kbd>I</kbd></button>
+        </div>
+        <div><button id="undoButton">Undo</button><button id="redoButton">Redo</button></div>
+      </div>
+      <div id="errorBanner" class="error-banner hidden"></div>
+      <div class="views">
+        <article><h2>Front <small>+Z</small></h2><div class="canvas-wrap"><canvas id="frontCanvas"></canvas></div></article>
+        <article><h2>Side <small>±X</small></h2><div class="canvas-wrap"><canvas id="sideCanvas"></canvas></div></article>
+        <article><h2>Back <small>−Z</small></h2><div class="canvas-wrap"><canvas id="backCanvas"></canvas></div></article>
+      </div>
+      <section class="palette panel">
+        <div class="panel-title"><span>Palette</span><button id="addColor">Add color</button></div>
+        <div id="paletteList"></div>
+      </section>
+    </section>
+
+    <aside class="rig-panel panel hidden" data-pane="rigging">
+      <div id="rigBonesSection">
+        <div class="panel-title"><span>Bones</span><button id="addBone">+</button></div>
+        <div id="boneTree" class="tree"></div>
+        <div class="part-actions"><button id="renameBone">Rename</button><button id="reparentBone">Reparent</button><button id="deleteBone" class="danger">Delete</button></div>
+      </div>
+      <div id="clipSection" class="hidden">
+        <div class="panel-title"><span>Clips</span><button id="addClip">+</button></div>
+        <div id="clipList" class="tree"></div>
+        <div class="part-actions"><button id="duplicateClip">Duplicate</button><button id="renameClip">Rename</button><button id="deleteClip" class="danger">Delete</button></div>
+        <div id="clipTiming" class="inspector"></div>
+      </div>
+      <section class="resize-box">
+        <div class="panel-title"><span>IK Chains</span><button id="addChain">+</button></div>
+        <div id="chainList" class="tree"></div>
+        <div class="part-actions"><button id="renameChain">Rename</button><button id="deleteChain" class="danger">Delete</button></div>
+      </section>
+    </aside>
+
+    <section class="workspace rig-workspace hidden" data-pane="rigging">
+      <div class="toolbar panel"><div><strong id="rigModeTitle">Rest pose</strong><button id="viewFront">Front</button><button id="viewSide">Side</button></div><div><button id="previousKey">Previous key</button><button id="nextKey">Next key</button><button id="deleteKey" class="danger">Delete key</button><button id="undoButtonRig">Undo</button><button id="redoButtonRig">Redo</button></div></div>
+      <div id="rigErrorBanner" class="error-banner hidden"></div>
+      <div class="rig-main">
+        <div class="rig-stage preview-stage"><div class="checker"></div><img id="rigImage" alt="Rig preview"><svg id="rigOverlay" viewBox="0 0 96 96" preserveAspectRatio="xMidYMid meet"></svg><div class="rig-help">Drag joints in the camera plane. Use numeric fields for depth and exact rotation.</div></div>
+        <aside class="bone-inspector panel"><div class="panel-title">Inspector</div><div id="boneInspector"></div><div id="keyInspector"></div></aside>
+      </div>
+      <div id="timeline" class="timeline hidden"></div>
+    </section>
+
+    <aside class="preview-panel panel">
+      <div class="panel-title">Preview</div>
+      <div class="segmented"><button data-mode="part" class="active">Part</button><button data-mode="character">Character</button></div>
+      <div class="preview-stage"><div class="checker"></div><img id="previewImage" alt="Live voxel preview"><div id="previewBusy">Rendering…</div></div>
+      <label>Yaw <output id="yawValue">0°</output><input id="yaw" type="range" min="0" max="359" value="0"></label>
+      <div id="animationControls" class="hidden">
+        <label>Clip <select id="clip"></select></label>
+        <label>Frame <output id="frameValue">0</output><input id="frame" type="range" min="0" max="0" value="0"></label>
+        <button id="play">Play</button>
+      </div>
+      <section class="export-settings">
+        <div class="panel-title"><span>Export</span></div>
+        <div id="exportAnimations"></div>
+        <div id="exportDirections"></div>
+        <button id="addExportDirection">Add direction</button>
+      </section>
+      <p class="hint">Drag across grids to paint. Front/back silhouettes stay synchronized automatically.</p>
+    </aside>
+  </main>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
