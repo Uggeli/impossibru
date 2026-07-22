@@ -4,7 +4,7 @@ import unittest
 
 import numpy as np
 
-from spritebuilder.animation import euler_matrix, evaluate_rest_pose
+from spritebuilder.animation import euler_matrix, evaluate_pose, evaluate_rest_pose
 from spritebuilder.document import load_document
 from spritebuilder.project import ProjectError, compile_project
 from spritebuilder.rigging import (chain_suggestions, drag_document, euler_from_matrix,
@@ -66,3 +66,23 @@ class RigKeyTests(unittest.TestCase):
         keys = changed["animations"]["idle"]["bones"]["root"]["translation"]
         self.assertEqual(len([k for k in keys if k["frame"] == 1]), 1)
         self.assertEqual(next(k for k in keys if k["frame"] == 1).get("interpolation"), "linear")
+
+    def test_dragging_ik_end_bone_creates_target_and_moves_whole_chain(self):
+        document = load_document(FIXTURE).data
+        project = compile_project(document)
+        clip = project.clips["idle"]
+        foot = evaluate_pose(project, clip, 1)["left_foot"][:3, 3]
+        x, y, depth = project_point(project, foot, 0)
+
+        changed = drag_document(document, "joint", "left_foot", [x + 3, y - 2],
+                                0, depth, "animate", "idle", 1)
+
+        target = changed["animations"]["idle"]["ik"]["left_leg"]["target"]
+        key = next(key for key in target if key["frame"] == 1)
+        np.testing.assert_allclose(key["value"], unproject_point(project, [x + 3, y - 2], depth, 0))
+        self.assertNotIn("left_lower_leg", changed["animations"]["idle"].get("bones", {}))
+        changed_project = compile_project(changed)
+        changed_pose = evaluate_pose(changed_project, changed_project.clips["idle"], 1)
+        self.assertFalse(np.allclose(changed_pose["left_lower_leg"][:3, 3],
+                                     evaluate_pose(project, clip, 1)["left_lower_leg"][:3, 3]))
+        np.testing.assert_allclose(changed_pose["left_foot"][:3, 3], key["value"], atol=1e-5)

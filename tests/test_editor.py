@@ -165,11 +165,18 @@ class EditorAPITests(unittest.TestCase):
         self.assertEqual((status, content_type), (200, "application/json; charset=utf-8"))
         preview = json.loads(body)
         self.assertTrue(preview["png"].startswith("iVBOR"))
+        self.assertEqual(preview["overlay"]["width"], document["export"]["size"][0] * 2)
+        self.assertEqual(preview["overlay"]["height"], document["export"]["size"][1] * 2)
+        self.assertEqual(preview["overlay"]["offset"],
+                         [document["export"]["size"][0] / 2,
+                          document["export"]["size"][1] / 2])
         self.assertEqual(len(preview["overlay"]["bones"]), len(document["rig"]["bones"]))
         head = next(b for b in preview["overlay"]["bones"] if b["name"] == "head")
+        offset = preview["overlay"]["offset"]
         status, _, body = self.call("POST", "/api/rig/drag", {
             "document": document, "kind": "joint", "name": "head",
-            "screen": [head["x"] + 3, head["y"]], "depth": head["depth"],
+            "screen": [head["x"] - offset[0] + 3, head["y"] - offset[1]],
+            "depth": head["depth"],
             "direction": 37, "mode": "rest"})
         self.assertEqual(status, 200)
         self.assertNotEqual(json.loads(body)["document"]["rig"]["bones"]["head"]["translation"],

@@ -34,7 +34,8 @@ def _conservative_pixels(projected: np.ndarray, scale: int):
     return px, py, (scale + 1) ** 2
 
 
-def render_pose(project: Project, pose: Dict[str, np.ndarray], direction: float) -> Image.Image:
+def render_pose(project: Project, pose: Dict[str, np.ndarray], direction: float,
+                size=None, origin=None) -> Image.Image:
     positions, colors, normals = [], [], []
     for name in project.bone_order:
         bone = project.bones[name]
@@ -47,7 +48,9 @@ def render_pose(project: Project, pose: Dict[str, np.ndarray], direction: float)
         normals.append((transform[:3, :3] @ part.normals.T).T)
         colors.append(part.colors)
     settings = project.export
-    image = np.empty((settings.height, settings.width, 4), dtype=np.uint8)
+    width, height = size or (settings.width, settings.height)
+    render_origin = origin or settings.origin
+    image = np.empty((height, width, 4), dtype=np.uint8)
     image[:] = settings.background
     if not positions:
         return Image.fromarray(image, "RGBA")
@@ -62,13 +65,13 @@ def render_pose(project: Project, pose: Dict[str, np.ndarray], direction: float)
     alpha = color[:, 3].astype(np.uint8)
 
     scale = settings.scale
-    projected = np.column_stack((settings.origin[0] + camera_points[:, 0] * scale,
-                                 settings.origin[1] - camera_points[:, 1] * scale))
+    projected = np.column_stack((render_origin[0] + camera_points[:, 0] * scale,
+                                 render_origin[1] - camera_points[:, 1] * scale))
     px, py, footprint = _conservative_pixels(projected, scale)
     depth = np.repeat(camera_points[:, 2], footprint)
     out_rgb = np.repeat(rgb, footprint, axis=0)
     out_alpha = np.repeat(alpha, footprint)
-    mask = (px >= 0) & (px < settings.width) & (py >= 0) & (py < settings.height)
+    mask = (px >= 0) & (px < width) & (py >= 0) & (py < height)
     px, py, depth, out_rgb, out_alpha = px[mask], py[mask], depth[mask], out_rgb[mask], out_alpha[mask]
     order = np.argsort(depth, kind="stable")
     px, py, out_rgb, out_alpha = px[order], py[order], out_rgb[order], out_alpha[order]

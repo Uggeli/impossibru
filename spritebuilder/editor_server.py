@@ -183,12 +183,17 @@ def _handler(session: EditorSession):
                         pose = evaluate_rest_pose(project)
                     else:
                         raise ProjectError("mode must be rest or animate")
-                    image = render_pose(project, pose, direction)
+                    viewport_size = (project.export.width * 2, project.export.height * 2)
+                    viewport_offset = (project.export.width / 2, project.export.height / 2)
+                    viewport_origin = (project.export.origin[0] + viewport_offset[0],
+                                       project.export.origin[1] + viewport_offset[1])
+                    image = render_pose(project, pose, direction, viewport_size, viewport_origin)
                     output = BytesIO()
                     image.save(output, format="PNG")
                     self._json(200, {
                         "png": base64.b64encode(output.getvalue()).decode("ascii"),
-                        "overlay": overlay_geometry(project, pose, direction, clip, frame),
+                        "overlay": overlay_geometry(project, pose, direction, clip, frame,
+                                                    viewport_offset, viewport_size),
                     })
                 elif route == "/api/rig/drag" and method == "POST":
                     screen = payload.get("screen")

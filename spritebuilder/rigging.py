@@ -50,12 +50,15 @@ def unproject_point(project: Project, screen, depth: float, yaw: float) -> np.nd
 
 
 def overlay_geometry(project: Project, pose: Mapping[str, np.ndarray], yaw: float,
-                     clip=None, frame: int = 0) -> Dict[str, Any]:
+                     clip=None, frame: int = 0, offset=(0.0, 0.0),
+                     size=None) -> Dict[str, Any]:
+    width, height = size or (project.export.width, project.export.height)
     bones = []
     for name in project.bone_order:
         point = project_point(project, pose[name][:3, 3], yaw)
         parent = project.bones[name].parent
-        bones.append({"name": name, "parent": parent, "x": point[0], "y": point[1],
+        bones.append({"name": name, "parent": parent,
+                      "x": point[0] + offset[0], "y": point[1] + offset[1],
                       "depth": point[2]})
     chains = []
     colors = ("#ff6b6b", "#63d7ff", "#d58cff", "#ffd166", "#70e000")
@@ -69,9 +72,9 @@ def overlay_geometry(project: Project, pose: Mapping[str, np.ndarray], yaw: floa
                 value = sample_track(tracks.get(kind), frame, clip.loop, clip.frames)
                 if value is not None:
                     x, y, depth = project_point(project, value, yaw)
-                    item[kind] = {"x": x, "y": y, "depth": depth}
+                    item[kind] = {"x": x + offset[0], "y": y + offset[1], "depth": depth}
         chains.append(item)
-    return {"width": project.export.width, "height": project.export.height,
+    return {"width": width, "height": height, "offset": list(offset),
             "bones": bones, "chains": chains}
 
 
@@ -156,17 +159,25 @@ def drag_document(document: Mapping[str, Any], kind: str, name: str, screen,
                 raise ProjectError(f"frame must be in 0..{clip.frames - 1}")
             parent = project.bones[name].parent
             target_bone = parent or name
-            tracks = result["animations"][clip_name].setdefault("bones", {}).setdefault(target_bone, {})
             if parent is None:
+                tracks = result["animations"][clip_name].setdefault("bones", {}).setdefault(
+                    target_bone, {})
                 value = (world - project.bones[name].translation).tolist()
                 set_key(tracks.setdefault("translation", []), frame, value)
             else:
                 from .animation import sample_track
                 for chain_name, chain in project.ik_chains.items():
                     chain_tracks = clip.ik.get(chain_name, {})
-                    target = sample_track(chain_tracks.get("target"), frame, clip.loop, clip.frames)
                     weight_v = sample_track(chain_tracks.get("weight"), frame, clip.loop, clip.frames)
                     weight = float(weight_v) if weight_v is not None else 1.0
+                    if name == chain.end and weight > 0:
+                        ik_tracks = result["animations"][clip_name].setdefault("ik", {}).setdefault(
+                            chain_name, {})
+                        set_key(ik_tracks.setdefault("target", []), frame,
+                                [float(v) for v in world])
+                        compile_project(result, path)
+                        return result
+                    target = sample_track(chain_tracks.get("target"), frame, clip.loop, clip.frames)
                     if parent in (chain.root, chain.mid) and target is not None and weight > 0:
                         raise ProjectError(
                             f"bone {parent!r} is controlled by IK chain {chain_name!r}; drag its IK target")
@@ -186,6 +197,8 @@ def drag_document(document: Mapping[str, Any], kind: str, name: str, screen,
                 # editor Euler component (front/back Z, side X).
                 axis = 0 if abs(math.sin(math.radians(yaw))) > .707 else 2
                 current[axis] = normalize_angle(current[axis] - angle)
+                tracks = result["animations"][clip_name].setdefault("bones", {}).setdefault(
+                    target_bone, {})
                 set_key(tracks.setdefault("rotation", []), frame, current)
     elif kind in ("target", "pole"):
         if mode != "animate" or clip_name not in project.clips or name not in project.ik_chains:
