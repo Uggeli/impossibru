@@ -65,10 +65,14 @@ def render_pose(project: Project, pose: Dict[str, np.ndarray], direction: float,
     alpha = color[:, 3].astype(np.uint8)
 
     scale = settings.scale
-    projected = np.column_stack((render_origin[0] + camera_points[:, 0] * scale,
-                                 render_origin[1] - camera_points[:, 1] * scale))
+    # Rounded like depth: voxel edges often fall exactly on pixel boundaries, where the last bit would
+    # otherwise decide which pixel a voxel covers.
+    projected = np.round(np.column_stack((render_origin[0] + camera_points[:, 0] * scale,
+                                          render_origin[1] - camera_points[:, 1] * scale)), 6)
     px, py, footprint = _conservative_pixels(projected, scale)
-    depth = np.repeat(camera_points[:, 2], footprint)
+    # Rounded so that voxels at the same depth tie exactly (kept in model order) whatever the last bit
+    # of the matrix products; equal depths are common in axis-aligned views.
+    depth = np.repeat(np.round(camera_points[:, 2], 6), footprint)
     out_rgb = np.repeat(rgb, footprint, axis=0)
     out_alpha = np.repeat(alpha, footprint)
     mask = (px >= 0) & (px < width) & (py >= 0) & (py < height)

@@ -61,6 +61,14 @@ class ExportSettings:
     directions: List[float]
     animations: List[str]
     background: Tuple[int, int, int, int]
+    # Crop each frame to its pixels and shelf-pack the frames; False keeps one row per clip direction.
+    trim: bool = False
+    # Keep only voxels on a part's surface (the interior is never seen).
+    shell: bool = False
+    # "radial": a part-sized ellipsoid's normals; "surface": each voxel's normal points away from the
+    # part's filled voxels within two voxels, so lighting follows the drawn shape.
+    normals: str = "radial"
+
 
 
 @dataclass
@@ -118,7 +126,43 @@ def _validate_chars(rows: List[str], palette: Mapping[str, Any], label: str) -> 
                 raise ProjectError(f"{label} uses unknown palette character {char!r} at row {y + 1}, column {x + 1}")
 
 
+def _voxel_grid(name: str, spec: Mapping[str, Any], palette: Mapping[str, Tuple[int, int, int, int]]) -> VoxelPart:
+    """A part given as a 3D grid: `size` [w, h, d] and `voxels`, run-length palette characters ('.' empty;
+    an optional count before each character) in x-fastest, then z, then y (bottom up) order."""
+    size = spec.get("size")
+    if not isinstance(size, (list, tuple)) or len(size) != 3 or any(not isinstance(v, int) or v < 1 for v in size):
+        raise ProjectError(f"parts.{name}.size must be three positive integers")
+    text = spec["voxels"]
+    if not isinstance(text, str):
+        raise ProjectError(f"parts.{name}.voxels must be a string")
+    cells: List[str] = []
+    for count, char in re.findall(r"(\d*)(\D)", text):
+        if char != "." and char not in palette:
+            raise ProjectError(f"parts.{name}.voxels uses unknown palette character {char!r}")
+        cells.extend(char * int(count or 1))
+    w, h, d = size
+    if len(cells) != w * h * d:
+        raise ProjectError(f"parts.{name}.voxels has {len(cells)} cells, size needs {w * h * d}")
+    cx, cy, cz = (w - 1) / 2, (h - 1) / 2, (d - 1) / 2
+    pivot = _vec(spec.get("pivot", [cx, 0, cz]), f"parts.{name}.pivot")
+    sx, sy, sz = max(cx, .5), max(cy, .5), max(cz, .5)
+    positions, colors, normals = [], [], []
+    for index, char in enumerate(cells):
+        if char == ".":
+            continue
+        x, z, y = index % w, index // w % d, index // (w * d)
+        radial = np.array([(x - cx) / sx, (y - cy) / sy, (z - cz) / sz])
+        positions.append(np.array([x, y, z], dtype=float) - pivot)
+        colors.append(palette[char])
+        normals.append(radial / max(np.linalg.norm(radial), 1.0))
+    if not positions:
+        raise ProjectError(f"parts.{name} produces no voxels")
+    return VoxelPart(name, np.asarray(positions), np.asarray(colors, dtype=np.uint8), np.asarray(normals))
+
+
 def _voxelize(name: str, spec: Mapping[str, Any], palette: Mapping[str, Tuple[int, int, int, int]]) -> VoxelPart:
+    if "voxels" in spec:
+        return _voxel_grid(name, spec, palette)
     front = _grid(spec.get("front"), f"parts.{name}.front")
     back = _grid(spec.get("back"), f"parts.{name}.back")
     side = _grid(spec.get("side"), f"parts.{name}.side")
@@ -160,6 +204,34 @@ def _voxelize(name: str, spec: Mapping[str, Any], palette: Mapping[str, Tuple[in
     if not positions:
         raise ProjectError(f"parts.{name} produces no voxels")
     return VoxelPart(name, np.asarray(positions), np.asarray(colors, dtype=np.uint8), np.asarray(normals))
+
+
+def _surface(part: VoxelPart, shell: bool, surface_normals: bool) -> VoxelPart:
+    """Surface normals and/or the surface shell of a voxelized part, keeping voxel order."""
+    cells = np.rint(part.positions - part.positions.min(axis=0)).astype(int)
+    reach = 2
+    grid = np.zeros(tuple(cells.max(axis=0) + 1 + 2 * reach), dtype=np.int64)
+    grid[tuple((cells + reach).T)] = 1
+    normals = part.normals
+    if surface_normals:
+        # Away from the filled voxels nearby: minus the sum of offsets to filled cells in a 5³ cube.
+        pull = np.zeros(cells.shape, dtype=np.int64)
+        for dx in range(-reach, reach + 1):
+            for dy in range(-reach, reach + 1):
+                for dz in range(-reach, reach + 1):
+                    filled = grid[cells[:, 0] + reach + dx, cells[:, 1] + reach + dy, cells[:, 2] + reach + dz]
+                    pull += filled[:, None] * np.array([dx, dy, dz])
+        size = np.sqrt((pull * pull).sum(axis=1))
+        normals = np.where(size[:, None] > 0, -pull / np.maximum(size, 1)[:, None], part.normals)
+    keep = np.ones(len(cells), dtype=bool)
+    if shell:
+        keep[:] = False
+        for axis in range(3):
+            for step in (-1, 1):
+                offset = cells + reach
+                offset[:, axis] += step
+                keep |= grid[tuple(offset.T)] == 0
+    return VoxelPart(part.name, part.positions[keep], part.colors[keep], normals[keep])
 
 
 def _topological_order(bones: Dict[str, Bone]) -> List[str]:
@@ -338,8 +410,15 @@ def compile_project(raw: Any, path: Any = "<memory>") -> Project:
     missing_animations = [name for name in export_animations if name not in clips]
     if missing_animations:
         raise ProjectError(f"export.animations references missing animation {missing_animations[0]!r}")
+    trim, shell, normals = out.get("trim", False), out.get("shell", False), out.get("normals", "radial")
+    if not isinstance(trim, bool) or not isinstance(shell, bool):
+        raise ProjectError("export.trim and export.shell must be booleans")
+    if normals not in ("radial", "surface"):
+        raise ProjectError("export.normals must be 'radial' or 'surface'")
+    if shell or normals == "surface":
+        parts = {name: _surface(part, shell, normals == "surface") for name, part in parts.items()}
     export = ExportSettings(str(out.get("name", project_path.stem)), width, height, scale,
                             (float(origin[0]), float(origin[1])), [float(x) for x in directions],
                             list(export_animations),
-                            _color(out.get("background", [0, 0, 0, 0]), "export.background"))
+                            _color(out.get("background", [0, 0, 0, 0]), "export.background"), trim, shell, normals)
     return Project(project_path, palette, parts, bones, bone_order, chains, clips, export)
