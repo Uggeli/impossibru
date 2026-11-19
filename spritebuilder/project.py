@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 import re
 import textwrap
@@ -8,6 +8,9 @@ from typing import Any, Dict, List, Mapping, Optional, Tuple
 
 import numpy as np
 import yaml
+
+from .spring_bones import (CopyRotationConstraint, Constraint, MirrorConstraint,
+                           SplineSpineConstraint, SpringBoneConfig)
 
 
 class ProjectError(ValueError):
@@ -31,6 +34,7 @@ class Bone:
     part: Optional[str]
     part_translation: np.ndarray
     part_rotation: np.ndarray
+    spring: Optional[SpringBoneConfig] = None
 
 
 @dataclass
@@ -49,6 +53,7 @@ class Clip:
     loop: bool
     bones: Dict[str, Mapping[str, Any]]
     ik: Dict[str, Mapping[str, Any]]
+    procedural: Optional[Dict[str, Any]] = None
 
 
 @dataclass
@@ -70,7 +75,6 @@ class ExportSettings:
     normals: str = "radial"
 
 
-
 @dataclass
 class Project:
     path: Path
@@ -81,6 +85,14 @@ class Project:
     ik_chains: Dict[str, IKChain]
     clips: Dict[str, Clip]
     export: ExportSettings
+    spring_bones: Dict[str, SpringBoneConfig] = field(default_factory=dict)
+    constraints: List[Constraint] = field(default_factory=list)
+
+    def autorig(self, preset: str = "humanoid") -> Project:
+        from .autorig import autorig_project
+        return autorig_project(self, preset=preset)
+
+
 
 
 def _vec(value: Any, label: str, length: int = 3) -> np.ndarray:
@@ -291,9 +303,12 @@ def load_project(path: Any) -> Project:
 
 def compile_project(raw: Any, path: Any = "<memory>") -> Project:
     """Validate and compile an already-parsed project document."""
+    from .spring_bones import (CopyRotationConstraint, Constraint, MirrorConstraint,
+                               SplineSpineConstraint, SpringBoneConfig)
     project_path = Path(path)
     if not isinstance(raw, Mapping):
         raise ProjectError("project root must be a mapping")
+
 
     pal_raw = raw.get("palette")
     if not isinstance(pal_raw, Mapping) or not pal_raw:
@@ -350,6 +365,109 @@ def compile_project(raw: Any, path: Any = "<memory>") -> Project:
             raise ProjectError(f"IK chain {name!r} must describe a direct root -> mid -> end hierarchy")
         chains[str(name)] = IKChain(str(name), *names)
 
+    spring_bones: Dict[str, SpringBoneConfig] = {}
+    sb_raw = rig.get("spring_bones")
+    if sb_raw is not None:
+        if not isinstance(sb_raw, Mapping):
+            raise ProjectError("rig.spring_bones must be a mapping")
+        for name, spec in sb_raw.items():
+            if name not in bones:
+                raise ProjectError(f"rig.spring_bones references missing bone {name!r}")
+            if not isinstance(spec, Mapping):
+                raise ProjectError(f"rig.spring_bones.{name} must be a mapping")
+            stiffness = float(spec.get("stiffness", 100.0))
+            damping = float(spec.get("damping", 10.0))
+            mass = float(spec.get("mass", 1.0))
+            drag = float(spec.get("drag", 0.1))
+            if stiffness < 0 or damping < 0 or mass <= 0 or drag < 0:
+                raise ProjectError(f"rig.spring_bones.{name} parameters must be non-negative (mass > 0)")
+            gravity = _vec(spec.get("gravity", [0.0, -9.81, 0.0]), f"rig.spring_bones.{name}.gravity")
+            limit_angle = spec.get("limit_angle", 45.0)
+            if limit_angle is not None:
+                try:
+                    limit_angle = float(limit_angle)
+                    if limit_angle < 0:
+                        raise ValueError()
+                except (TypeError, ValueError):
+                    raise ProjectError(f"rig.spring_bones.{name}.limit_angle must be a non-negative number")
+            cfg = SpringBoneConfig(str(name), stiffness, damping, mass, drag, gravity, limit_angle)
+            spring_bones[str(name)] = cfg
+            bones[str(name)].spring = cfg
+
+    for name, spec in rig["bones"].items():
+        if name in spring_bones:
+            continue
+        if isinstance(spec, Mapping) and "spring" in spec:
+            sp_spec = spec["spring"]
+            if not isinstance(sp_spec, Mapping):
+                raise ProjectError(f"rig.bones.{name}.spring must be a mapping")
+            stiffness = float(sp_spec.get("stiffness", 100.0))
+            damping = float(sp_spec.get("damping", 10.0))
+            mass = float(sp_spec.get("mass", 1.0))
+            drag = float(sp_spec.get("drag", 0.1))
+            if stiffness < 0 or damping < 0 or mass <= 0 or drag < 0:
+                raise ProjectError(f"rig.bones.{name}.spring parameters must be non-negative (mass > 0)")
+            gravity = _vec(sp_spec.get("gravity", [0.0, -9.81, 0.0]), f"rig.bones.{name}.spring.gravity")
+            limit_angle = sp_spec.get("limit_angle", 45.0)
+            if limit_angle is not None:
+                try:
+                    limit_angle = float(limit_angle)
+                    if limit_angle < 0:
+                        raise ValueError()
+                except (TypeError, ValueError):
+                    raise ProjectError(f"rig.bones.{name}.spring.limit_angle must be a non-negative number")
+            cfg = SpringBoneConfig(str(name), stiffness, damping, mass, drag, gravity, limit_angle)
+            spring_bones[str(name)] = cfg
+            bones[str(name)].spring = cfg
+
+    constraints: List[Constraint] = []
+    c_raw = rig.get("constraints")
+    if c_raw is not None:
+        if isinstance(c_raw, Mapping):
+            c_raw = list(c_raw.values())
+        if not isinstance(c_raw, list):
+            raise ProjectError("rig.constraints must be a list or mapping")
+        for idx, spec in enumerate(c_raw):
+            if not isinstance(spec, Mapping):
+                raise ProjectError(f"rig.constraints[{idx}] must be a mapping")
+            c_type = spec.get("type") or spec.get("kind")
+            c_name = str(spec.get("name", f"constraint_{idx}"))
+            if c_type in ("spline_spine", "spline"):
+                b_list = spec.get("bones", [])
+                if not isinstance(b_list, list) or not b_list:
+                    raise ProjectError(f"constraint {c_name!r} must have a non-empty bones list")
+                for b in b_list:
+                    if b not in bones:
+                        raise ProjectError(f"constraint {c_name!r} references missing bone {b!r}")
+                driver = spec.get("driver")
+                if driver is not None and driver not in bones:
+                    raise ProjectError(f"constraint {c_name!r} references missing driver bone {driver!r}")
+                tot_rot = spec.get("total_rotation")
+                if tot_rot is not None:
+                    tot_rot = tuple(_vec(tot_rot, f"constraint {c_name!r}.total_rotation"))
+                constraints.append(SplineSpineConstraint(c_name, [str(b) for b in b_list], driver, tot_rot))
+            elif c_type == "mirror":
+                src = spec.get("source")
+                tgt = spec.get("target")
+                if src not in bones or tgt not in bones:
+                    raise ProjectError(f"mirror constraint {c_name!r} references missing source or target bone")
+                plane = str(spec.get("plane", "yz"))
+                if plane.lower() not in ("yz", "xz", "xy", "x", "y", "z"):
+                    raise ProjectError(f"mirror constraint {c_name!r} invalid plane {plane!r}")
+                inf = float(spec.get("influence", 1.0))
+                constraints.append(MirrorConstraint(c_name, str(src), str(tgt), plane, inf))
+            elif c_type in ("copy_rotation", "copy_rot"):
+                src = spec.get("source")
+                tgt = spec.get("target")
+                if src not in bones or tgt not in bones:
+                    raise ProjectError(f"copy_rotation constraint {c_name!r} references missing source or target bone")
+                inf = float(spec.get("influence", 1.0))
+                axes = tuple(bool(x) for x in spec.get("axes", [True, True, True]))
+                invert = tuple(bool(x) for x in spec.get("invert", [False, False, False]))
+                constraints.append(CopyRotationConstraint(c_name, str(src), str(tgt), inf, axes, invert))
+            else:
+                raise ProjectError(f"unknown constraint type {c_type!r}")
+
     anim_raw = raw.get("animations")
     if not isinstance(anim_raw, Mapping) or not anim_raw:
         raise ProjectError("animations must be a non-empty mapping")
@@ -384,8 +502,14 @@ def compile_project(raw: Any, path: Any = "<memory>") -> Project:
                 _keys(track, f"{label}.ik.{chain_name}.{track_name}", frames, widths[track_name])
                 if track_name == "weight" and any(not 0 <= float(k["value"]) <= 1 for k in track):
                     raise ProjectError(f"{label}.ik.{chain_name}.weight must stay within 0..1")
+        proc_raw = spec.get("procedural")
+        procedural = None
+        if proc_raw is not None:
+            if not isinstance(proc_raw, Mapping):
+                raise ProjectError(f"{label}.procedural must be a mapping")
+            procedural = dict(proc_raw)
         clips[str(name)] = Clip(str(name), frames, float(fps), bool(spec.get("loop", True)),
-                                dict(bone_tracks), dict(ik_tracks))
+                                dict(bone_tracks), dict(ik_tracks), procedural)
 
     out = raw.get("export", {})
     if not isinstance(out, Mapping):
@@ -421,4 +545,4 @@ def compile_project(raw: Any, path: Any = "<memory>") -> Project:
                             (float(origin[0]), float(origin[1])), [float(x) for x in directions],
                             list(export_animations),
                             _color(out.get("background", [0, 0, 0, 0]), "export.background"), trim, shell, normals)
-    return Project(project_path, palette, parts, bones, bone_order, chains, clips, export)
+    return Project(project_path, palette, parts, bones, bone_order, chains, clips, export, spring_bones, constraints)

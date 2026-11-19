@@ -60,6 +60,36 @@ class IKTests(unittest.TestCase):
         self.assertFalse(np.allclose(weighted[1], weighted[0]))
         self.assertFalse(np.allclose(weighted[1], weighted[2]))
 
+    def test_translated_root_pole_vector_translational_invariance(self):
+        root_0 = np.array([0., 0., 0.])
+        target_0 = np.array([0., -10., 0.])
+        pole_0 = np.array([0., -5., 5.])
+        l1, l2 = 6.0, 6.0
+        j0, e0 = solve_two_bone(root_0, target_0, l1, l2, pole_0)
+
+        offset = np.array([100., 50., 20.])
+        j1, e1 = solve_two_bone(root_0 + offset, target_0 + offset, l1, l2, pole_0 + offset)
+        np.testing.assert_allclose(j1, j0 + offset, atol=1e-6)
+        np.testing.assert_allclose(e1, e0 + offset, atol=1e-6)
+
+    def test_collinear_pole_fallback_handles_parallel_direction(self):
+        root = np.array([0., 0., 0.])
+        target = np.array([0., 0., 5.])  # Collinear with Z
+        pole = np.array([0., 0., 2.])    # Collinear with Z
+        joint, end = solve_two_bone(root, target, 3, 3, pole)
+        self.assertFalse(np.isnan(joint).any())
+        self.assertFalse(np.isnan(end).any())
+        self.assertAlmostEqual(np.linalg.norm(joint - root), 3, places=5)
+
+    def test_zero_length_bone_does_not_divide_by_zero(self):
+        root = np.array([1., 2., 3.])
+        target = np.array([1., 2., 7.])
+        pole = np.array([1., 5., 3.])
+        joint, end = solve_two_bone(root, target, 0.0, 4.0, pole)
+        self.assertFalse(np.isnan(joint).any())
+        self.assertFalse(np.isnan(end).any())
+        np.testing.assert_allclose(joint, root, atol=1e-6)
+
 
 class ProjectTests(unittest.TestCase):
     def test_fixture_is_valid(self):

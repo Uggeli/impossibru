@@ -26,6 +26,17 @@ class EditableDocument:
     def compile(self) -> Project:
         return compile_project(self.data, self.path)
 
+    def autorig(self, preset: str = "humanoid") -> Dict[str, Any]:
+        return autorig_document(self, preset=preset)
+
+
+def autorig_document(document: Any, preset: str = "humanoid") -> Dict[str, Any]:
+    from .autorig import autorig_document_data
+    if isinstance(document, EditableDocument):
+        document.data = autorig_document_data(document.data, preset=preset)
+        return document.data
+    return autorig_document_data(document, preset=preset)
+
 
 class _BlockDumper(yaml.SafeDumper):
     pass

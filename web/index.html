@@ -37,7 +37,12 @@
           <button data-tool="pencil" class="active">Pencil <kbd>P</kbd></button>
           <button data-tool="eraser">Erase <kbd>E</kbd></button>
           <button data-tool="fill">Fill <kbd>F</kbd></button>
+          <button data-tool="line">Line <kbd>L</kbd></button>
+          <button data-tool="rect">Rect <kbd>R</kbd></button>
+          <button data-tool="replace">Replace <kbd>C</kbd></button>
           <button data-tool="eyedropper">Pick <kbd>I</kbd></button>
+          <button id="mirrorToggle" title="Toggle vertical symmetry mode (M)">Mirror <kbd>M</kbd></button>
+          <button id="syncSilhouette" title="Reconcile front and back silhouettes">Sync Silhouette</button>
         </div>
         <div><button id="undoButton">Undo</button><button id="redoButton">Redo</button></div>
       </div>
@@ -55,7 +60,7 @@
 
     <aside class="rig-panel panel hidden" data-pane="rigging">
       <div id="rigBonesSection">
-        <div class="panel-title"><span>Bones</span><button id="addBone">+</button></div>
+        <div class="panel-title"><span>Bones</span><div class="rig-bone-actions"><select id="autoRigPreset" class="compact-select" title="Autorig Preset"><option value="humanoid">Humanoid</option><option value="quadruped">Quadruped</option><option value="creature">Creature</option></select><button id="autoRigButton" title="Autorig character">Autorig</button><button id="addBone" title="Add bone">+</button></div></div>
         <div id="boneTree" class="tree"></div>
         <div class="part-actions"><button id="renameBone">Rename</button><button id="reparentBone">Reparent</button><button id="deleteBone" class="danger">Delete</button></div>
       </div>
@@ -64,6 +69,10 @@
         <div id="clipList" class="tree"></div>
         <div class="part-actions"><button id="duplicateClip">Duplicate</button><button id="renameClip">Rename</button><button id="deleteClip" class="danger">Delete</button></div>
         <div id="clipTiming" class="inspector"></div>
+        <div id="proceduralSection">
+          <div class="panel-title"><span>Procedural Animation</span></div>
+          <div id="proceduralInspector" class="inspector"></div>
+        </div>
       </div>
       <section class="resize-box">
         <div class="panel-title"><span>IK Chains</span><button id="addChain">+</button></div>
@@ -76,8 +85,8 @@
       <div class="toolbar panel"><div><strong id="rigModeTitle">Rest pose</strong><button id="viewFront">Front</button><button id="viewSide">Side</button></div><div><button id="previousKey">Previous key</button><button id="nextKey">Next key</button><button id="deleteKey" class="danger">Delete key</button><button id="undoButtonRig">Undo</button><button id="redoButtonRig">Redo</button></div></div>
       <div id="rigErrorBanner" class="error-banner hidden"></div>
       <div class="rig-main">
-        <div class="rig-stage preview-stage"><div class="checker"></div><img id="rigImage" alt="Rig preview"><svg id="rigOverlay" viewBox="0 0 96 96" preserveAspectRatio="xMidYMid meet"></svg><div class="rig-help">Drag joints in the camera plane. Use numeric fields for depth and exact rotation.</div></div>
-        <aside class="bone-inspector panel"><div class="panel-title">Inspector</div><div id="boneInspector"></div><div id="keyInspector"></div></aside>
+        <div class="rig-stage preview-stage"><div class="checker"></div><img id="rigImage" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"><svg id="rigOverlay" viewBox="0 0 96 96" preserveAspectRatio="xMidYMid meet"></svg><div class="rig-help">Drag joints in the camera plane. Use numeric fields for depth and exact rotation.</div></div>
+        <aside class="bone-inspector panel"><div class="panel-title">Inspector</div><div id="boneInspector"></div><div id="springInspector"></div><div id="constraintInspector"></div><div id="keyInspector"></div></aside>
       </div>
       <div id="timeline" class="timeline hidden"></div>
     </section>
@@ -85,7 +94,7 @@
     <aside class="preview-panel panel">
       <div class="panel-title">Preview</div>
       <div class="segmented"><button data-mode="part" class="active">Part</button><button data-mode="character">Character</button></div>
-      <div class="preview-stage"><div class="checker"></div><img id="previewImage" alt="Live voxel preview"><div id="previewBusy">Rendering…</div></div>
+      <div class="preview-stage"><div class="checker"></div><img id="previewImage" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"><div id="previewBusy">Rendering…</div></div>
       <label>Yaw <output id="yawValue">0°</output><input id="yaw" type="range" min="0" max="359" value="0"></label>
       <div id="animationControls" class="hidden">
         <label>Clip <select id="clip"></select></label>
@@ -104,6 +113,29 @@
   <section id="welcome" class="welcome">
     <div class="welcome-card"><img src="./mark.png" alt=""><h1>Impossibru!</h1><p>Draw, rig, animate, and export voxel characters. Your project stays on this device.</p><div class="welcome-actions"><button id="welcomeNew">New project</button><button id="welcomeOpen">Open YAML</button><button id="welcomeRecover">Recover draft</button><button id="welcomeExample">Try example</button></div></div>
   </section>
+
+  <!-- Modern In-DOM Modal System -->
+  <div id="modalOverlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modalTitle">Dialog</h3>
+        <button id="modalClose" class="icon modal-close-btn" title="Close" aria-label="Close">×</button>
+      </div>
+      <div class="modal-body">
+        <p id="modalMessage"></p>
+        <div id="modalInputContainer" class="modal-input-group hidden">
+          <input id="modalInput" type="text" class="modal-input" autocomplete="off" spellcheck="false">
+          <div id="modalError" class="modal-error hidden"></div>
+        </div>
+        <div id="modalCustomSlot" class="hidden"></div>
+      </div>
+      <div class="modal-actions">
+        <button id="modalCancelButton">Cancel</button>
+        <button id="modalConfirmButton" class="modal-confirm">OK</button>
+      </div>
+    </div>
+  </div>
+
   <script type="module" src="/src/app.ts"></script>
 </body>
 </html>

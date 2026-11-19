@@ -1,0 +1,523 @@
+palette:
+  s: '#F0C49A'
+  h: '#4A3022'
+  e: '#221A1A'
+  r: '#D04646'
+  b: '#3E64B0'
+  n: '#603E2A'
+parts:
+  torso:
+    pivot:
+    - 3.5
+    - 0
+    - 1.5
+    front: |-
+      .rrrrrr.
+      rrrrrrrr
+      rrrsrsrr
+      rrrrrrrr
+      rrrrrrrr
+      rrrrsrrr
+      rssrrrsr
+      .rsssss.
+      .rrrrrr.
+      ..rrrr..
+    back: |-
+      .srsrss.
+      rrrrrrrr
+      rrrrrrrr
+      rrrrrrrr
+      rrrrrrrr
+      rrrrrrrr
+      rrrrrrrr
+      .rrrrrr.
+      .rrrrrr.
+      ..rrrr..
+    side: |
+      .rr.
+      rrrr
+      rrrr
+      rrrr
+      rrrr
+      rrrr
+      rrrr
+      rrrr
+      rrrr
+      .rr.
+  head:
+    pivot:
+    - 4.5
+    - 0
+    - 2.5
+    front: |-
+      ..........
+      ..........
+      ...hhhh...
+      ..hhhhhh..
+      .hhhhhhhh.
+      .hssssssh.
+      .ssessess.
+      .ssssssss.
+      ..ssssss..
+      ...ssss...
+    back: |-
+      ..........
+      ..........
+      ...hhhh...
+      ..hhhhhh..
+      .hhhhhhhh.
+      .hhhhhhhh.
+      .hhhhhhhh.
+      .hhhhhhhh.
+      ..hhhhhh..
+      ...hhhh...
+    side: |-
+      ......
+      ......
+      .hhhh.
+      hhhhhh
+      hhhhhh
+      hsssss
+      hsssss
+      ssssss
+      .ssss.
+      ..ss..
+  upper_arm:
+    pivot:
+    - 1.5
+    - 0
+    - 1.5
+    front: |
+      .rr.
+      rrrr
+      rrrr
+      rrrr
+      rrrr
+      .rr.
+    back: |
+      .rr.
+      rrrr
+      rrrr
+      rrrr
+      rrrr
+      .rr.
+    side: |
+      .rr.
+      rrrr
+      rrrr
+      rrrr
+      rrrr
+      .rr.
+  lower_arm:
+    pivot:
+    - 1.5
+    - 0
+    - 1.5
+    front: |
+      .rr.
+      rrrr
+      rrrr
+      rrrr
+      rrrr
+      .ss.
+    back: |
+      .rr.
+      rrrr
+      rrrr
+      rrrr
+      rrrr
+      .ss.
+    side: |
+      .rr.
+      rrrr
+      rrrr
+      rrrr
+      rrrr
+      .ss.
+  upper_leg:
+    pivot:
+    - 2
+    - 0
+    - 2
+    front: |
+      .bbb.
+      bbbbb
+      bbbbb
+      bbbbb
+      bbbbb
+      bbbbb
+      .bbb.
+    back: |
+      .bbb.
+      bbbbb
+      bbbbb
+      bbbbb
+      bbbbb
+      bbbbb
+      .bbb.
+    side: |
+      .bbb.
+      bbbbb
+      bbbbb
+      bbbbb
+      bbbbb
+      bbbbb
+      .bbb.
+  lower_leg:
+    pivot:
+    - 1.5
+    - 0
+    - 1.5
+    front: |
+      .bbb
+      bbbb
+      bbbb
+      bbbb
+      bbbb
+      bbbb
+      .nn.
+    back: |
+      .bbb
+      bbbb
+      bbbb
+      bbbb
+      bbbb
+      bbbb
+      .nn.
+    side: |
+      .bbb
+      bbbb
+      bbbb
+      bbbb
+      bbbb
+      bbbb
+      .nn.
+  foot:
+    pivot:
+    - 1.5
+    - 0
+    - 1
+    front: |
+      .nn.
+      nnnn
+      nnnn
+    back: |
+      .nn.
+      nnnn
+      nnnn
+    side: |
+      .nnnn.
+      nnnnnn
+      nnnnnn
+rig:
+  bones:
+    root:
+      translation:
+      - 0
+      - 14
+      - 0
+      attachment: {}
+    torso:
+      parent: root
+      part: torso
+    head:
+      parent: torso
+      translation:
+      - 0
+      - 9
+      - 0
+      part: head
+    left_upper_arm:
+      parent: torso
+      translation:
+      - 5
+      - 8
+      - 0
+      part: upper_arm
+      attachment:
+        rotation:
+        - 0
+        - 0
+        - 180
+    left_lower_arm:
+      parent: left_upper_arm
+      translation:
+      - 0
+      - -6
+      - 0
+      part: lower_arm
+      attachment:
+        rotation:
+        - 0
+        - 0
+        - 180
+    right_upper_arm:
+      parent: torso
+      translation:
+      - -5
+      - 8
+      - 0
+      part: upper_arm
+      attachment:
+        rotation:
+        - 0
+        - 0
+        - 180
+    right_lower_arm:
+      parent: right_upper_arm
+      translation:
+      - 0
+      - -6
+      - 0
+      part: lower_arm
+      attachment:
+        rotation:
+        - 0
+        - 0
+        - 180
+    left_upper_leg:
+      parent: root
+      translation:
+      - 2
+      - 0
+      - 0
+      part: upper_leg
+      attachment:
+        rotation:
+        - 0
+        - 0
+        - 180
+    left_lower_leg:
+      parent: left_upper_leg
+      translation:
+      - 0
+      - -7
+      - 0
+      part: lower_leg
+      attachment:
+        rotation:
+        - 0
+        - 0
+        - 180
+    left_foot:
+      parent: left_lower_leg
+      translation:
+      - 0
+      - -7
+      - 0
+      part: foot
+    right_upper_leg:
+      parent: root
+      translation:
+      - -2
+      - 0
+      - 0
+      part: upper_leg
+      attachment:
+        rotation:
+        - 0
+        - 0
+        - 180
+    right_lower_leg:
+      parent: right_upper_leg
+      translation:
+      - 0
+      - -7
+      - 0
+      part: lower_leg
+      attachment:
+        rotation:
+        - 0
+        - 0
+        - 180
+    right_foot:
+      parent: right_lower_leg
+      translation:
+      - 0
+      - -7
+      - 0
+      part: foot
+  ik_chains:
+    left_leg:
+      root: left_upper_leg
+      mid: left_lower_leg
+      end: left_foot
+    right_leg:
+      root: right_upper_leg
+      mid: right_lower_leg
+      end: right_foot
+animations:
+  idle:
+    frames: 4
+    fps: 6
+    loop: true
+    bones:
+      root:
+        translation:
+        - frame: 0
+          value:
+          - 0
+          - 0
+          - 0
+          interpolation: smooth
+        - frame: 2
+          value:
+          - 0
+          - -0.5
+          - 0
+          interpolation: smooth
+  walk:
+    frames: 8
+    fps: 10
+    loop: true
+    bones:
+      left_upper_arm:
+        rotation:
+        - frame: 0
+          value:
+          - 25
+          - 0
+          - 0
+          interpolation: smooth
+        - frame: 4
+          value:
+          - -25
+          - 0
+          - 0
+          interpolation: smooth
+      right_upper_arm:
+        rotation:
+        - frame: 0
+          value:
+          - -25
+          - 0
+          - 0
+          interpolation: smooth
+        - frame: 4
+          value:
+          - 25
+          - 0
+          - 0
+          interpolation: smooth
+      torso:
+        rotation:
+        - frame: 7
+          value:
+          - 10.918394001111807
+          - 0
+          - 0
+          interpolation: linear
+    ik:
+      left_leg:
+        target:
+        - frame: 0
+          value:
+          - 2
+          - 0
+          - 4
+          interpolation: smooth
+        - frame: 2
+          value:
+          - 2
+          - 2
+          - 0
+          interpolation: smooth
+        - frame: 4
+          value:
+          - 2
+          - 0
+          - -4
+          interpolation: smooth
+        - frame: 6
+          value:
+          - 2
+          - 0
+          - 0
+          interpolation: smooth
+        pole:
+        - frame: 0
+          value:
+          - 0
+          - 0
+          - 1
+        weight:
+        - frame: 0
+          value: 1
+      right_leg:
+        target:
+        - frame: 0
+          value:
+          - -2
+          - 0
+          - -4
+          interpolation: smooth
+        - frame: 2
+          value:
+          - -2
+          - 0
+          - 0
+          interpolation: smooth
+        - frame: 4
+          value:
+          - -2
+          - 0
+          - 4
+          interpolation: smooth
+        - frame: 6
+          value:
+          - -2
+          - 2
+          - 0
+          interpolation: smooth
+        pole:
+        - frame: 0
+          value:
+          - 0
+          - 0
+          - 1
+        weight:
+        - frame: 0
+          value: 1
+  attack:
+    frames: 8
+    fps: 10
+    loop: true
+    bones:
+      right_upper_arm:
+        rotation:
+        - frame: 0
+          value:
+          - -10.861160207434978
+          - 0
+          - 0
+          interpolation: linear
+        - frame: 7
+          value:
+          - -111.59678113441662
+          - 0
+          - 0
+          interpolation: linear
+    ik: {}
+export:
+  name: humanoid
+  size:
+  - 96
+  - 112
+  scale: 3
+  origin:
+  - 48
+  - 104
+  directions:
+  - 0
+  - 45
+  - 90
+  - 135
+  - 180
+  - 225
+  - 270
+  - 315
+  background:
+  - 0
+  - 0
+  - 0
+  - 0

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import math
-from typing import Dict, Mapping, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Mapping, Optional, Tuple
 
 import numpy as np
 
-from .project import Clip, Project
+if TYPE_CHECKING:
+    from .project import Clip, Project
 
 
 def norm(v: np.ndarray) -> np.ndarray:
@@ -21,6 +22,21 @@ def euler_matrix(degrees) -> np.ndarray:
     ry = np.array([[cy, 0, sy], [0, 1, 0], [-sy, 0, cy]])
     rz = np.array([[cz, -sz, 0], [sz, cz, 0], [0, 0, 1]])
     return rx @ ry @ rz
+
+
+def euler_from_matrix(m: np.ndarray) -> np.ndarray:
+    """Extract XYZ Euler angles in degrees from 3x3 rotation matrix."""
+    sy = math.sqrt(m[0, 0] * m[0, 0] + m[1, 0] * m[1, 0])
+    singular = sy < 1e-6
+    if not singular:
+        x = math.atan2(m[2, 1], m[2, 2])
+        y = math.atan2(-m[2, 0], sy)
+        z = math.atan2(m[1, 0], m[0, 0])
+    else:
+        x = math.atan2(-m[1, 2], m[1, 1])
+        y = math.atan2(-m[2, 0], sy)
+        z = 0.0
+    return np.degrees([x, y, z])
 
 
 def matrix4(rotation=None, translation=None) -> np.ndarray:
@@ -139,7 +155,7 @@ def _world_from_local(project: Project, local_r: Dict[str, np.ndarray], local_t:
     return world
 
 
-def evaluate_rest_pose(project: Project) -> Dict[str, np.ndarray]:
+def evaluate_rest_pose(project: Project, apply_constraints: bool = False) -> Dict[str, np.ndarray]:
     """Evaluate bone origins in the authored rest pose.
 
     Kept separate from :func:`evaluate_pose` so editor operations never need a
@@ -149,7 +165,11 @@ def evaluate_rest_pose(project: Project) -> Dict[str, np.ndarray]:
                for name in project.bone_order}
     local_t = {name: project.bones[name].translation.copy()
                for name in project.bone_order}
-    return _world_from_local(project, local_r, local_t)
+    world = _world_from_local(project, local_r, local_t)
+    if apply_constraints and getattr(project, "constraints", None):
+        from .spring_bones import evaluate_constraints
+        world = evaluate_constraints(project, world)
+    return world
 
 
 def solve_two_bone(root, target, l1, l2, pole) -> Tuple[np.ndarray, np.ndarray]:
@@ -158,20 +178,34 @@ def solve_two_bone(root, target, l1, l2, pole) -> Tuple[np.ndarray, np.ndarray]:
     raw_distance = np.linalg.norm(delta)
     direction = norm(delta) if raw_distance > 1e-9 else np.array([0., -1., 0.])
     distance = max(abs(l1-l2) + 1e-6, min(l1+l2 - 1e-6, raw_distance))
-    bend = pole - np.dot(pole, direction) * direction
+    rel_pole = pole - root
+    bend = rel_pole - np.dot(rel_pole, direction) * direction
     if np.linalg.norm(bend) < 1e-6:
-        bend = np.cross(direction, [0, 0, 1])
+        bend = np.cross(direction, [0., 0., 1.])
         if np.linalg.norm(bend) < 1e-6:
-            bend = np.cross(direction, [1, 0, 0])
+            bend = np.cross(direction, [1., 0., 0.])
     bend = norm(bend)
-    cos_angle = (l1*l1 + distance*distance - l2*l2) / (2*l1*distance)
-    angle = math.acos(max(-1, min(1, cos_angle)))
+    denom = max(1e-9, 2 * l1 * distance)
+    cos_angle = (l1*l1 + distance*distance - l2*l2) / denom
+    angle = math.acos(max(-1.0, min(1.0, cos_angle)))
     joint = root + l1 * (math.cos(angle)*direction + math.sin(angle)*bend)
     end = root + distance * direction
     return joint, end
 
 
-def evaluate_pose(project: Project, clip: Clip, frame: int) -> Dict[str, np.ndarray]:
+def evaluate_pose(
+    project: Project,
+    clip: Clip,
+    frame: int,
+    time: Optional[float] = None,
+    procedural_overrides: Optional[Dict[str, Any]] = None,
+    dt: float = 0.0,
+    solver: Optional[Any] = None,
+    apply_physics: bool = True,
+    apply_constraints: bool = True,
+) -> Dict[str, np.ndarray]:
+    from .procedural import apply_procedural
+
     local_r, local_t = {}, {}
     for name in project.bone_order:
         bone, tracks = project.bones[name], clip.bones.get(name, {})
@@ -179,8 +213,8 @@ def evaluate_pose(project: Project, clip: Clip, frame: int) -> Dict[str, np.ndar
         rotation = sample_rotation(tracks.get("rotation"), frame, clip.loop, clip.frames)
         local_t[name] = bone.translation + (translation if translation is not None else 0)
         local_r[name] = euler_matrix(bone.rotation) @ rotation
-    world = _world_from_local(project, local_r, local_t)
 
+    ik_targets: Dict[str, Dict[str, Any]] = {}
     for chain_name, tracks in clip.ik.items():
         weight_v = sample_track(tracks.get("weight"), frame, clip.loop, clip.frames)
         weight = float(weight_v) if weight_v is not None else 1.0
@@ -189,23 +223,58 @@ def evaluate_pose(project: Project, clip: Clip, frame: int) -> Dict[str, np.ndar
             continue
         pole = sample_track(tracks.get("pole"), frame, clip.loop, clip.frames)
         pole = pole if pole is not None else np.array([0., 0., 1.])
+        ik_targets[chain_name] = {"target": target, "pole": pole, "weight": weight}
+
+    calc_time = time if time is not None else (frame / clip.fps if clip.fps > 0 else 0.0)
+    procedural_config = {}
+    if getattr(clip, "procedural", None):
+        procedural_config.update(clip.procedural)
+    if procedural_overrides:
+        procedural_config.update(procedural_overrides)
+
+    if procedural_config:
+        apply_procedural(project, clip, frame, calc_time, procedural_config, local_r, local_t, ik_targets)
+
+    world = _world_from_local(project, local_r, local_t)
+
+    for chain_name, target_info in ik_targets.items():
+        if chain_name not in project.ik_chains:
+            continue
+        weight = target_info.get("weight", 1.0)
+        target = target_info.get("target")
+        pole = target_info.get("pole", np.array([0., 0., 1.]))
+        if target is None or weight <= 0:
+            continue
+
         chain = project.ik_chains[chain_name]
         root_p, mid_p, end_p = (world[n][:3, 3].copy() for n in (chain.root, chain.mid, chain.end))
-        l1, l2 = np.linalg.norm(mid_p-root_p), np.linalg.norm(end_p-mid_p)
+        l1, l2 = np.linalg.norm(mid_p - root_p), np.linalg.norm(end_p - mid_p)
         joint, end = solve_two_bone(root_p, target, l1, l2, pole)
         original_root, original_mid = local_r[chain.root].copy(), local_r[chain.mid].copy()
 
-        root_world_r = rot_from_to(mid_p-root_p, joint-root_p) @ world[chain.root][:3, :3]
+        root_world_r = rot_from_to(mid_p - root_p, joint - root_p) @ world[chain.root][:3, :3]
         root_parent = project.bones[chain.root].parent
         parent_r = world[root_parent][:3, :3] if root_parent else np.eye(3)
         solved_root = parent_r.T @ root_world_r
         local_r[chain.root] = solved_root
         world = _world_from_local(project, local_r, local_t)
+
         mid_p2, end_p2 = world[chain.mid][:3, 3], world[chain.end][:3, 3]
-        mid_world_r = rot_from_to(end_p2-mid_p2, end-mid_p2) @ world[chain.mid][:3, :3]
+        mid_world_r = rot_from_to(end_p2 - mid_p2, end - mid_p2) @ world[chain.mid][:3, :3]
         solved_mid = world[chain.root][:3, :3].T @ mid_world_r
 
         local_r[chain.root] = slerp_matrix(original_root, solved_root, weight)
         local_r[chain.mid] = slerp_matrix(original_mid, solved_mid, weight)
         world = _world_from_local(project, local_r, local_t)
+
+    if apply_constraints and getattr(project, "constraints", None):
+        from .spring_bones import evaluate_constraints
+        world = evaluate_constraints(project, world)
+
+    if apply_physics and getattr(project, "spring_bones", None):
+        from .spring_bones import SpringBoneSolver
+        if solver is None:
+            solver = SpringBoneSolver(project)
+        world = solver.step(world, dt)
+
     return world

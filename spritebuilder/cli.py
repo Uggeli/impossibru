@@ -26,6 +26,10 @@ def parser() -> argparse.ArgumentParser:
     new.add_argument("--edit", action="store_true", help="open the new project in the editor")
     new.add_argument("--port", type=int, default=0, help="local editor port")
     new.add_argument("--no-browser", action="store_true", help="do not open the browser automatically")
+    autorig_cmd = commands.add_parser("autorig", help="automatically generate rig and IK chains")
+    autorig_cmd.add_argument("project", type=Path)
+    autorig_cmd.add_argument("--preset", default="humanoid", help="autorig preset name")
+    autorig_cmd.add_argument("--output", "-o", type=Path, default=None, help="output path for rigged file")
     return result
 
 
@@ -38,6 +42,16 @@ def main(argv=None) -> int:
             if args.edit:
                 from .editor_server import run_editor
                 run_editor(args.project, args.port, not args.no_browser)
+            return 0
+        if args.command == "autorig":
+            from .document import autorig_document, dump_document, load_document
+            doc = load_document(args.project)
+            updated = autorig_document(doc, preset=args.preset)
+            target = args.output if args.output else args.project
+            target.write_text(dump_document(updated), encoding="utf-8")
+            bones_cnt = len(updated.get("rig", {}).get("bones", {}))
+            ik_cnt = len(updated.get("rig", {}).get("ik_chains", {}))
+            print(f"autorigged {target} ({bones_cnt} bones, {ik_cnt} ik chains)")
             return 0
         project = load_project(args.project)
         if args.command == "edit":

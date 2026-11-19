@@ -131,7 +131,7 @@ class EditorAPITests(unittest.TestCase):
     def test_project_validate_preview_and_save(self):
         status, content_type, body = self.call("GET", "/")
         self.assertEqual((status, content_type), (200, "text/html"))
-        self.assertIn(b"Sprite Builder", body)
+        self.assertIn(b"Impossibru!", body)
         status, _, body = self.call("GET", "/api/project")
         self.assertEqual(status, 200)
         payload = json.loads(body)
@@ -205,6 +205,37 @@ class EditorAPITests(unittest.TestCase):
         self.assertEqual(status, 422)
         status, _, _ = self.call("POST", "/api/project/new", {"filename": "../escape.yaml"})
         self.assertEqual(status, 422)
+
+    def test_rig_autorig_endpoint_humanoid(self):
+        _, _, body = self.call("GET", "/api/project")
+        document = json.loads(body)["document"]
+        status, content_type, body = self.call("POST", "/api/rig/autorig", {
+            "document": document, "preset": "humanoid"})
+        self.assertEqual(status, 200)
+        payload = json.loads(body)
+        self.assertIn("document", payload)
+        self.assertIn("project", payload)
+        self.assertIn("rig", payload)
+        self.assertEqual(len(payload["document"]["rig"]["bones"]), 13)
+        self.assertIn("left_leg", payload["document"]["rig"]["ik_chains"])
+
+    def test_rig_autorig_endpoint_quadruped_and_project_key(self):
+        _, _, body = self.call("GET", "/api/project")
+        document = json.loads(body)["document"]
+        status, _, body = self.call("POST", "/api/rig/autorig", {
+            "project": document, "preset": "quadruped"})
+        self.assertEqual(status, 200)
+        payload = json.loads(body)
+        self.assertIn("front_left_leg", payload["rig"]["ik_chains"])
+
+    def test_rig_autorig_invalid_preset_returns_422(self):
+        _, _, body = self.call("GET", "/api/project")
+        document = json.loads(body)["document"]
+        status, _, body = self.call("POST", "/api/rig/autorig", {
+            "document": document, "preset": "invalid_alien_preset"})
+        self.assertEqual(status, 422)
+        payload = json.loads(body)
+        self.assertFalse(payload["valid"])
 
 
 if __name__ == "__main__":

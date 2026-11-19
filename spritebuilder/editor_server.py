@@ -14,6 +14,7 @@ from urllib.parse import urlparse
 import webbrowser
 
 from .animation import evaluate_pose, evaluate_rest_pose
+from .autorig import autorig_document_data
 from .document import (EditableDocument, SaveConflict, create_document, load_document,
                        save_document, structured_error)
 from .project import ProjectError, compile_project
@@ -136,9 +137,19 @@ def _handler(session: EditorSession):
                                      "source_hash": session.document.source_hash,
                                      "summary": session.summary})
                     return
-                data = payload.get("document")
+                data = payload.get("document") if "document" in payload else payload.get("project")
                 if not isinstance(data, dict):
-                    raise ProjectError("document must be an object")
+                    raise ProjectError("document or project must be an object")
+                if route in ("/api/rig/autorig", "/api/autorig") and method == "POST":
+                    preset = str(payload.get("preset", "humanoid"))
+                    updated = autorig_document_data(data, preset=preset)
+                    session.document.data = updated
+                    self._json(200, {
+                        "document": updated,
+                        "project": updated,
+                        "rig": updated.get("rig", {}),
+                    })
+                    return
                 project = compile_project(data, session.document.path)
                 if route == "/api/validate" and method == "POST":
                     self._json(200, {"valid": True, "summary": {
@@ -156,7 +167,8 @@ def _handler(session: EditorSession):
                         frame = int(payload.get("frame", 0))
                         if frame < 0 or frame >= clip.frames:
                             raise ProjectError(f"frame must be in 0..{clip.frames - 1}")
-                        image = render_pose(project, evaluate_pose(project, clip, frame), direction)
+                        proc_override = payload.get("procedural")
+                        image = render_pose(project, evaluate_pose(project, clip, frame, procedural_overrides=proc_override), direction)
                     output = BytesIO()
                     image.save(output, format="PNG")
                     content = output.getvalue()
@@ -171,6 +183,7 @@ def _handler(session: EditorSession):
                     mode = payload.get("mode", "rest")
                     clip = None
                     frame = int(payload.get("frame", 0))
+                    proc_override = payload.get("procedural")
                     if mode == "animate":
                         clip_name = str(payload.get("clip", ""))
                         if clip_name not in project.clips:
@@ -178,7 +191,7 @@ def _handler(session: EditorSession):
                         clip = project.clips[clip_name]
                         if frame < 0 or frame >= clip.frames:
                             raise ProjectError(f"frame must be in 0..{clip.frames - 1}")
-                        pose = evaluate_pose(project, clip, frame)
+                        pose = evaluate_pose(project, clip, frame, procedural_overrides=proc_override)
                     elif mode == "rest":
                         pose = evaluate_rest_pose(project)
                     else:

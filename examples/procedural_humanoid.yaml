@@ -1,0 +1,351 @@
+palette:
+  s: '#F0C49A'
+  h: '#4A3022'
+  e: '#221A1A'
+  r: '#D04646'
+  b: '#3E64B0'
+  n: '#603E2A'
+  k: '#9a9996'
+  c: '#A020F0'
+parts:
+  torso:
+    pivot: [3.5, 0, 1.5]
+    front: |-
+      .rrrrrr.
+      rrrrrrrr
+      bbbbbbbb
+      rrrrrrrr
+      bbbbbbbb
+      rrrrsrrr
+      bbbbbrbb
+      .rsssss.
+      .rrrrrr.
+      ..rrrr..
+    back: |-
+      .srsrss.
+      rrrrrrrr
+      bbbbbbbb
+      rrsssssr
+      bbbbbbbb
+      rrrrrrrr
+      bbbbbbbb
+      .rrrrrr.
+      .rrrrrr.
+      ..rrrr..
+    side: |-
+      .rr.
+      rrrr
+      bbbb
+      rrrr
+      bbbb
+      rrrr
+      brbr
+      rrrr
+      rrrr
+      .rr.
+  head:
+    pivot: [4.5, 0, 2.5]
+    front: |-
+      ..........
+      ..........
+      ...hhhh...
+      ..hhhhhh..
+      .hhhhhhhh.
+      .hssssssh.
+      .ssessess.
+      .ssssssss.
+      ..ssssss..
+      ...ssss...
+    back: |-
+      ..........
+      ..........
+      ...hhhh...
+      ..hhhhhh..
+      .hhhhhhhh.
+      .hhhhhhhh.
+      .hhhhhhhh.
+      .hhhhhhhh.
+      ..hhhhhh..
+      ...hhhh...
+    side: |-
+      ......
+      ......
+      .hhhh.
+      hhhhhh
+      hhhhhh
+      hsssss
+      hsssss
+      ssssss
+      .ssss.
+      ..ss..
+  upper_arm:
+    pivot: [1.5, 0, 1.5]
+    front: |-
+      .rr.
+      bbbb
+      rrrr
+      bbbb
+      rrrr
+      .rr.
+    back: |-
+      .rr.
+      rrrr
+      rrrr
+      rrrr
+      rrrr
+      .rr.
+    side: |-
+      .rr.
+      rrrr
+      rrrr
+      rrrr
+      rrrr
+      .rr.
+  lower_arm:
+    pivot: [1.5, 0, 1.5]
+    front: |-
+      .rr.
+      rrrr
+      rrrr
+      rrrr
+      rrrr
+      .ss.
+    back: |-
+      .rr.
+      rrrr
+      rrrr
+      rrrr
+      rrrr
+      .ss.
+    side: |-
+      .rr.
+      rrrr
+      rrrr
+      rrrr
+      rrrr
+      .ss.
+  upper_leg:
+    pivot: [2, 0, 2]
+    front: |-
+      .bbb.
+      bbbbb
+      bbbbb
+      bbbbb
+      bbbbb
+      bbbbb
+      .bbb.
+    back: |-
+      .bbb.
+      bbbbb
+      bbbbb
+      bbbbb
+      bbbbb
+      bbbbb
+      .bbb.
+    side: |-
+      .bbb.
+      bbbbb
+      bbbbb
+      bbbbb
+      bbbbb
+      bbbbb
+      .bbb.
+  lower_leg:
+    pivot: [1.5, 0, 1.5]
+    front: |-
+      .bbb
+      bbbb
+      bbbb
+      bbbb
+      bbbb
+      bbbb
+      .nn.
+    back: |-
+      .bbb
+      bbbb
+      bbbb
+      bbbb
+      bbbb
+      bbbb
+      .nn.
+    side: |-
+      .bbb
+      bbbb
+      bbbb
+      bbbb
+      bbbb
+      bbbb
+      .nn.
+  foot:
+    pivot: [1.5, 0, 1]
+    front: |-
+      .nn.
+      nnnn
+      nnnn
+    back: |-
+      .nn.
+      nnnn
+      nnnn
+    side: |-
+      .nnnn.
+      nnnnnn
+      nnnnnn
+  cape:
+    pivot: [2, 0, 0.5]
+    front: |-
+      cccc
+      cccc
+      cccc
+      cccc
+      cccc
+      .cc.
+    back: |-
+      cccc
+      cccc
+      cccc
+      cccc
+      cccc
+      .cc.
+    side: |-
+      .c.
+      .c.
+      .c.
+      .c.
+      .c.
+      .c.
+rig:
+  bones:
+    root:
+      translation: [0, 14, 0]
+    torso:
+      parent: root
+      part: torso
+    head:
+      parent: torso
+      translation: [0, 9, 0]
+      part: head
+    left_upper_arm:
+      parent: torso
+      translation: [5, 8, 0]
+      part: upper_arm
+      attachment:
+        rotation: [0, 0, 180]
+    left_lower_arm:
+      parent: left_upper_arm
+      translation: [0, -6, 0]
+      part: lower_arm
+      attachment:
+        rotation: [0, 0, 180]
+    right_upper_arm:
+      parent: torso
+      translation: [-5, 8, 0]
+      part: upper_arm
+      attachment:
+        rotation: [0, 0, 180]
+    right_lower_arm:
+      parent: right_upper_arm
+      translation: [0, -6, 0]
+      part: lower_arm
+      attachment:
+        rotation: [0, 0, 180]
+    left_upper_leg:
+      parent: root
+      translation: [2, 0, 0]
+      part: upper_leg
+      attachment:
+        rotation: [0, 0, 180]
+    left_lower_leg:
+      parent: left_upper_leg
+      translation: [0, -7, 0]
+      part: lower_leg
+      attachment:
+        rotation: [0, 0, 180]
+    left_foot:
+      parent: left_lower_leg
+      translation: [0, -7, 0]
+      part: foot
+    right_upper_leg:
+      parent: root
+      translation: [-2, 0, 0]
+      part: upper_leg
+      attachment:
+        rotation: [0, 0, 180]
+    right_lower_leg:
+      parent: right_upper_leg
+      translation: [0, -7, 0]
+      part: lower_leg
+      attachment:
+        rotation: [0, 0, 180]
+    right_foot:
+      parent: right_lower_leg
+      translation: [0, -7, 0]
+      part: foot
+    cape:
+      parent: torso
+      translation: [0, 8, -2]
+      part: cape
+  ik_chains:
+    left_leg:
+      root: left_upper_leg
+      mid: left_lower_leg
+      end: left_foot
+    right_leg:
+      root: right_upper_leg
+      mid: right_lower_leg
+      end: right_foot
+  spring_bones:
+    cape:
+      stiffness: 0.1
+      damping: 0.8
+animations:
+  idle_procedural:
+    frames: 8
+    fps: 10
+    loop: true
+    bones: {}
+    ik: {}
+    procedural:
+      breathing:
+        rate: 0.25
+        intensity: 1.0
+        chest_bone: torso
+        head_bone: head
+      look_at:
+        target: [10.0, 15.0, 20.0]
+        head_bone: head
+        spine_bones: [torso]
+  walk_procedural:
+    frames: 12
+    fps: 12
+    loop: true
+    bones: {}
+    ik: {}
+    procedural:
+      gait:
+        speed: 1.0
+        stride_length: 4.0
+        stride_height: 2.0
+        hip_bounce: 0.8
+        arm_swing: 30.0
+        left_leg_chain: left_leg
+        right_leg_chain: right_leg
+        left_arm_bone: left_upper_arm
+        right_arm_bone: right_upper_arm
+        root_bone: root
+      lean:
+        velocity: [0.0, 0.0, 2.0]
+        acceleration: [0.0, 0.0, 1.0]
+        turn_rate: 0.2
+        landing_impact: 0.0
+      spring_bones:
+        - name: cape
+          stiffness: 0.1
+          damping: 0.8
+export:
+  name: procedural_humanoid
+  size: [96, 112]
+  scale: 3
+  origin: [48, 104]
+  directions: [0, 45, 90, 135, 180, 225, 270, 315]
+  animations: [idle_procedural, walk_procedural]
+  background: [0, 0, 0, 0]
