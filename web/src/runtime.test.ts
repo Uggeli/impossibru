@@ -46,8 +46,10 @@ describe('Browser API Client Router (browserRequest)', () => {
     expect(() => validateProject(payload.document)).not.toThrow();
   });
 
-  it('handles POST /api/validate validating document and caching draft', async () => {
-    setupTestEnvironment();
+  it('handles POST /api/validate without changing the recovery draft', async () => {
+    const previous = starterProject('previous');
+    const store = setupTestEnvironment().idbStore;
+    store.set('current', {document:previous,time:3});
     const doc = starterProject('validate_test');
     const res = await browserRequest('/api/validate', {
       body: JSON.stringify({ document: doc }),
@@ -56,6 +58,7 @@ describe('Browser API Client Router (browserRequest)', () => {
     const payload = await res.json();
     expect(payload.valid).toBe(true);
     expect(payload.summary.bones).toContain('root');
+    expect(store.get('current')).toEqual({document:previous,time:3});
   });
 
   it('handles POST /api/preview returning canvas dataUrl for character and part modes', async () => {

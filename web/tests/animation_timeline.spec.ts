@@ -74,7 +74,7 @@ test.describe('Animation Timeline & Playback Controls (Tiers 1-4)', () => {
     await frame2Btn.click();
 
     // Modify bone rotation X to 45
-    const rotX = vecInput(page, 'R°', 'X');
+    const rotX = vecInput(page, 'Rotation °', 'X');
     await rotX.fill('45');
     await rotX.dispatchEvent('change');
     await page.waitForTimeout(200);
@@ -92,7 +92,7 @@ test.describe('Animation Timeline & Playback Controls (Tiers 1-4)', () => {
     const frame1Btn = page.locator('#timeline .track-row').filter({ hasText: 'translation' }).locator('button').nth(2);
     await frame1Btn.click();
 
-    const transY = vecInput(page, 'T', 'Y');
+    const transY = vecInput(page, 'Position', 'Y');
     await transY.fill('2.5');
     await transY.dispatchEvent('change');
     await page.waitForTimeout(200);
@@ -114,12 +114,12 @@ test.describe('Animation Timeline & Playback Controls (Tiers 1-4)', () => {
     const frame5 = page.locator('#timeline .track-row').filter({ hasText: 'rotation' }).locator('button').nth(6);
 
     await frame1.click();
-    await vecInput(page, 'R°', 'Y').fill('15');
-    await vecInput(page, 'R°', 'Y').dispatchEvent('change');
+    await vecInput(page, 'Rotation °', 'Y').fill('15');
+    await vecInput(page, 'Rotation °', 'Y').dispatchEvent('change');
 
     await frame5.click();
-    await vecInput(page, 'R°', 'Y').fill('30');
-    await vecInput(page, 'R°', 'Y').dispatchEvent('change');
+    await vecInput(page, 'Rotation °', 'Y').fill('30');
+    await vecInput(page, 'Rotation °', 'Y').dispatchEvent('change');
 
     // Go to frame 0
     await page.locator('#timeline .track-row').filter({ hasText: 'rotation' }).locator('button').nth(1).click();
@@ -143,8 +143,8 @@ test.describe('Animation Timeline & Playback Controls (Tiers 1-4)', () => {
     const frame0 = page.locator('#timeline .track-row').filter({ hasText: 'rotation' }).locator('button').nth(1);
     await frame0.click();
 
-    await vecInput(page, 'R°', 'Z').fill('20');
-    await vecInput(page, 'R°', 'Z').dispatchEvent('change');
+    await vecInput(page, 'Rotation °', 'Z').fill('20');
+    await vecInput(page, 'Rotation °', 'Z').dispatchEvent('change');
     await page.waitForTimeout(200);
 
     // Key inspector should have interpolation select dropdown
@@ -244,7 +244,7 @@ test.describe('Animation Timeline & Playback Controls (Tiers 1-4)', () => {
     // 2. Set key at frame 0
     const frame0 = page.locator('#timeline .track-row').filter({ hasText: 'rotation' }).locator('button').nth(1);
     await frame0.click();
-    const rotX = vecInput(page, 'R°', 'X');
+    const rotX = vecInput(page, 'Rotation °', 'X');
     await rotX.fill('0');
     await rotX.dispatchEvent('change');
     await page.waitForTimeout(100);
@@ -269,7 +269,7 @@ test.describe('Animation Timeline & Playback Controls (Tiers 1-4)', () => {
     // Create keyframe in idle at frame 0
     const frame0 = page.locator('#timeline .track-row').filter({ hasText: 'rotation' }).locator('button').nth(1);
     await frame0.click();
-    const rotX = vecInput(page, 'R°', 'X');
+    const rotX = vecInput(page, 'Rotation °', 'X');
     await rotX.fill('10');
     await rotX.dispatchEvent('change');
     await page.waitForTimeout(100);
@@ -317,7 +317,7 @@ test.describe('Animation Timeline & Playback Controls (Tiers 1-4)', () => {
     // 3. Anticipation pose at frame 0 (Translation Y = -0.5)
     const frame0 = page.locator('#timeline .track-row').filter({ hasText: 'translation' }).locator('button').nth(1);
     await frame0.click();
-    const transY = vecInput(page, 'T', 'Y');
+    const transY = vecInput(page, 'Position', 'Y');
     await transY.fill('-0.5');
     await transY.dispatchEvent('change');
     await page.waitForTimeout(100);
@@ -327,7 +327,7 @@ test.describe('Animation Timeline & Playback Controls (Tiers 1-4)', () => {
     await frame3.click();
     await transY.fill('2.0');
     await transY.dispatchEvent('change');
-    const rotX = vecInput(page, 'R°', 'X');
+    const rotX = vecInput(page, 'Rotation °', 'X');
     await rotX.fill('-15');
     await rotX.dispatchEvent('change');
     await page.waitForTimeout(100);
@@ -359,7 +359,7 @@ test.describe('Animation Timeline & Playback Controls (Tiers 1-4)', () => {
     const frame1Btn = rotRow.locator('button').nth(2);
     await frame1Btn.click();
 
-    const rotX = vecInput(page, 'R°', 'X');
+    const rotX = vecInput(page, 'Rotation °', 'X');
     await rotX.fill('35');
     await rotX.dispatchEvent('change');
     await page.waitForTimeout(150);
@@ -405,13 +405,13 @@ test.describe('Animation Timeline & Playback Controls (Tiers 1-4)', () => {
 
     // Create key at frame 1 with value 20
     await frame1Btn.click();
-    await vecInput(page, 'R°', 'Y').fill('20');
-    await vecInput(page, 'R°', 'Y').dispatchEvent('change');
+    await vecInput(page, 'Rotation °', 'Y').fill('20');
+    await vecInput(page, 'Rotation °', 'Y').dispatchEvent('change');
 
     // Create key at frame 5 with value 50
     await frame5Btn.click();
-    await vecInput(page, 'R°', 'Y').fill('50');
-    await vecInput(page, 'R°', 'Y').dispatchEvent('change');
+    await vecInput(page, 'Rotation °', 'Y').fill('50');
+    await vecInput(page, 'Rotation °', 'Y').dispatchEvent('change');
     await page.waitForTimeout(150);
 
     await expect(rotRow.locator('button.key')).toHaveCount(2);
@@ -429,7 +429,7 @@ test.describe('Animation Timeline & Playback Controls (Tiers 1-4)', () => {
     await expect(frame1Btn).not.toHaveClass(/key/);
     await expect(frame5Btn).toHaveClass(/key/);
     await expect(rotRow.locator('button.key')).toHaveCount(1);
-    await expect(vecInput(page, 'R°', 'Y')).toHaveValue('20');
+    await expect(vecInput(page, 'Rotation °', 'Y')).toHaveValue('20');
   });
 
   test('Tier 4: Delete keyframe via inspector button and Delete keyboard shortcut', async ({ page }) => {
@@ -438,8 +438,8 @@ test.describe('Animation Timeline & Playback Controls (Tiers 1-4)', () => {
 
     // 1. Create key at frame 2
     await frame2Btn.click();
-    await vecInput(page, 'R°', 'Z').fill('30');
-    await vecInput(page, 'R°', 'Z').dispatchEvent('change');
+    await vecInput(page, 'Rotation °', 'Z').fill('30');
+    await vecInput(page, 'Rotation °', 'Z').dispatchEvent('change');
     await page.waitForTimeout(150);
 
     await expect(frame2Btn).toHaveClass(/key/);
@@ -455,8 +455,8 @@ test.describe('Animation Timeline & Playback Controls (Tiers 1-4)', () => {
     // 3. Create key at frame 3 and delete via Delete keyboard shortcut
     const frame3Btn = rotRow.locator('button').nth(4);
     await frame3Btn.click();
-    await vecInput(page, 'R°', 'Z').fill('45');
-    await vecInput(page, 'R°', 'Z').dispatchEvent('change');
+    await vecInput(page, 'Rotation °', 'Z').fill('45');
+    await vecInput(page, 'Rotation °', 'Z').dispatchEvent('change');
     await page.waitForTimeout(150);
 
     await expect(frame3Btn).toHaveClass(/key/);

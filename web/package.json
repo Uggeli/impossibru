@@ -1,7 +1,7 @@
 {
   "name": "impossibru-web",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {"dev":"vite","preview":"vite preview","build":"tsc -b && vite build","test":"vitest run","test:browser":"playwright test"},
   "dependencies": {"fflate":"^0.8.2","js-yaml":"^4.1.0"},

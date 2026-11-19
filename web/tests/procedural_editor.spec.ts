@@ -34,7 +34,7 @@ test('test-drive autorigging, spring physics, and procedural animation controls'
   await page.screenshot({ path: testInfo.outputPath('02_autorigged_workspace.png') });
 
   // 4. Select a bone in the tree to inspect spring physics & constraints
-  const boneItem = page.locator('#boneTree button').first();
+  const boneItem = page.locator('#boneTree .bone-name').first();
   if (await boneItem.isVisible()) {
     await boneItem.click();
     await page.waitForTimeout(300);

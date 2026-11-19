@@ -28,7 +28,7 @@ test.describe('Challenger 2 Adversarial Stress Tests: Drag-to-Retime, Collision 
 
     // 1. Create key at frame 0 with rotation Y = 40
     await frame0Btn.click();
-    const rotY = vecInput(page, 'R°', 'Y');
+    const rotY = vecInput(page, 'Rotation °', 'Y');
     await rotY.fill('40');
     await rotY.dispatchEvent('change');
     await page.waitForTimeout(100);
@@ -76,7 +76,7 @@ test.describe('Challenger 2 Adversarial Stress Tests: Drag-to-Retime, Collision 
 
     // 1. Create key at frame 3
     await frame3Btn.click();
-    const rotZ = vecInput(page, 'R°', 'Z');
+    const rotZ = vecInput(page, 'Rotation °', 'Z');
     await rotZ.fill('75');
     await rotZ.dispatchEvent('change');
     await page.waitForTimeout(100);
@@ -124,8 +124,8 @@ test.describe('Challenger 2 Adversarial Stress Tests: Drag-to-Retime, Collision 
 
     // Create key at frame 0
     await f0.click();
-    await vecInput(page, 'R°', 'X').fill('50');
-    await vecInput(page, 'R°', 'X').dispatchEvent('change');
+    await vecInput(page, 'Rotation °', 'X').fill('50');
+    await vecInput(page, 'Rotation °', 'X').dispatchEvent('change');
     await page.waitForTimeout(100);
 
     // Step 1: Retime 0 -> 2
@@ -202,14 +202,14 @@ test.describe('Challenger 2 Adversarial Stress Tests: Drag-to-Retime, Collision 
 
     // 1. Key 1 at frame 1 (value = 25)
     await f1.click();
-    await vecInput(page, 'R°', 'X').fill('25');
-    await vecInput(page, 'R°', 'X').dispatchEvent('change');
+    await vecInput(page, 'Rotation °', 'X').fill('25');
+    await vecInput(page, 'Rotation °', 'X').dispatchEvent('change');
     await page.waitForTimeout(100);
 
     // 2. Key 2 at frame 5 (value = 85)
     await f5.click();
-    await vecInput(page, 'R°', 'X').fill('85');
-    await vecInput(page, 'R°', 'X').dispatchEvent('change');
+    await vecInput(page, 'Rotation °', 'X').fill('85');
+    await vecInput(page, 'Rotation °', 'X').dispatchEvent('change');
     await page.waitForTimeout(100);
 
     await expect(rotRow.locator('button.key')).toHaveCount(2);
@@ -227,7 +227,7 @@ test.describe('Challenger 2 Adversarial Stress Tests: Drag-to-Retime, Collision 
     await expect(rotRow.locator('button.key')).toHaveCount(1);
     await expect(f1).not.toHaveClass(/key/);
     await expect(f5).toHaveClass(/key/);
-    await expect(vecInput(page, 'R°', 'X')).toHaveValue('25');
+    await expect(vecInput(page, 'Rotation °', 'X')).toHaveValue('25');
 
     // 4. Undo collision overwrite
     await page.locator('#undoButtonRig').click();
@@ -239,10 +239,10 @@ test.describe('Challenger 2 Adversarial Stress Tests: Drag-to-Retime, Collision 
     await expect(f5).toHaveClass(/key/);
 
     await f1.click();
-    await expect(vecInput(page, 'R°', 'X')).toHaveValue('25');
+    await expect(vecInput(page, 'Rotation °', 'X')).toHaveValue('25');
 
     await f5.click();
-    await expect(vecInput(page, 'R°', 'X')).toHaveValue('85');
+    await expect(vecInput(page, 'Rotation °', 'X')).toHaveValue('85');
   });
 
   // =========================================================================
@@ -373,7 +373,7 @@ test.describe('Challenger 2 Adversarial Stress Tests: Drag-to-Retime, Collision 
     await expect(frameValue).toHaveText('0');
 
     // 2. Test Bone vector input isolation
-    const rotX = vecInput(page, 'R°', 'X');
+    const rotX = vecInput(page, 'Rotation °', 'X');
     await rotX.focus();
     await page.keyboard.press('Space');
     await page.keyboard.press('[');

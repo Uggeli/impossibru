@@ -32,12 +32,12 @@ test.describe('Autorig & Physics Inspectors (Tiers 1-4)', () => {
     await page.waitForTimeout(300);
 
     // Bone tree should have bones
-    await expect(page.locator('#boneTree button').first()).toBeVisible();
+    await expect(page.locator('#boneTree .bone-name').first()).toBeVisible();
   });
 
   test('Tier 1: Bone hierarchy selection populates bone inspector and physics containers', async ({ page }) => {
     await page.locator('button[data-workspace="rig"]').click();
-    const firstBone = page.locator('#boneTree button').first();
+    const firstBone = page.locator('#boneTree .bone-name').first();
     await expect(firstBone).toBeVisible();
     await firstBone.click();
 
@@ -163,7 +163,7 @@ test.describe('Autorig & Physics Inspectors (Tiers 1-4)', () => {
     await page.waitForTimeout(300);
 
     // 2. Select first bone
-    const bone = page.locator('#boneTree button').first();
+    const bone = page.locator('#boneTree .bone-name').first();
     await bone.click();
     await expect(bone).toHaveClass(/active/);
 
@@ -191,7 +191,7 @@ test.describe('Autorig & Physics Inspectors (Tiers 1-4)', () => {
     await page.waitForTimeout(300);
 
     // 2. Inspect bones and spring physics container
-    const bones = page.locator('#boneTree button');
+    const bones = page.locator('#boneTree .bone-name');
     const count = await bones.count();
     expect(count).toBeGreaterThan(0);
 

@@ -52,8 +52,8 @@ test.describe('Rigging & Inverse Kinematics Workspace (Tiers 1-4)', () => {
 
     await expect(rootBone).toHaveClass(/active/);
     await expect(page.locator('#boneInspector h3')).toHaveText('root');
-    await expect(page.locator('#boneInspector .vec span').getByText('T', { exact: true })).toBeVisible();
-    await expect(page.locator('#boneInspector .vec span').getByText('R°', { exact: true })).toBeVisible();
+    await expect(page.locator('#boneInspector').getByText('Position', { exact: true })).toBeVisible();
+    await expect(page.locator('#boneInspector').getByText('Rotation °', { exact: true })).toBeVisible();
   });
 
   test('Tier 1: Add new child bone in hierarchy', async ({ page }) => {
@@ -103,13 +103,13 @@ test.describe('Rigging & Inverse Kinematics Workspace (Tiers 1-4)', () => {
     await rootBone.click();
 
     // Edit Translation Y
-    const transY = vecInput(page, 'T', 'Y');
+    const transY = vecInput(page, 'Position', 'Y');
     await transY.fill('1.5');
     await transY.dispatchEvent('change');
     await page.waitForTimeout(200);
 
     // Edit Rotation Z
-    const rotZ = vecInput(page, 'R°', 'Z');
+    const rotZ = vecInput(page, 'Rotation °', 'Z');
     await rotZ.fill('45');
     await rotZ.dispatchEvent('change');
     await page.waitForTimeout(200);
@@ -129,7 +129,7 @@ test.describe('Rigging & Inverse Kinematics Workspace (Tiers 1-4)', () => {
     await page.waitForTimeout(200);
 
     // Edit Attachment offset Translation X
-    const attachTransX = vecInput(page, 'AT', 'X');
+    const attachTransX = vecInput(page, 'Attachment position', 'X');
     await attachTransX.fill('0.5');
     await attachTransX.dispatchEvent('change');
     await page.waitForTimeout(200);
@@ -350,7 +350,7 @@ test.describe('Rigging & Inverse Kinematics Workspace (Tiers 1-4)', () => {
     // 3. Inspect head bone rotation
     await page.locator('#boneTree button:has-text("head")').click();
     await page.waitForTimeout(100);
-    const rotX = vecInput(page, 'R°', 'X');
+    const rotX = vecInput(page, 'Rotation °', 'X');
     await rotX.fill('15');
     await rotX.dispatchEvent('change');
     await page.waitForTimeout(100);

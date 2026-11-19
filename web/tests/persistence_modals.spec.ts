@@ -32,7 +32,7 @@ test.describe('Persistence, Export & Modal Dialogs (Tiers 1-4)', () => {
     await expect(welcome).toBeVisible();
     await expect(page.locator('#welcomeNew')).toBeVisible();
     await expect(page.locator('#welcomeOpen')).toBeVisible();
-    await expect(page.locator('#welcomeRecover')).toBeVisible();
+    await expect(page.locator('#welcomeRecover')).toBeHidden();
     await expect(page.locator('#welcomeExample')).toBeVisible();
   });
 
@@ -112,8 +112,9 @@ test.describe('Persistence, Export & Modal Dialogs (Tiers 1-4)', () => {
       await page.waitForLoadState('networkidle');
     }
 
+    await page.locator('#exportZipButton').click();
+    await page.locator('#exportAngle').fill('60');
     await page.locator('#addExportDirection').click();
-    await respondModal(page, '60');
     await page.waitForTimeout(200);
 
     await expect(page.locator('#exportDirections .direction-chip:has-text("60°")')).toBeVisible();
@@ -127,6 +128,7 @@ test.describe('Persistence, Export & Modal Dialogs (Tiers 1-4)', () => {
       await page.waitForLoadState('networkidle');
     }
 
+    await page.locator('#exportZipButton').click();
     const exportDirections = page.locator('#exportDirections');
     await exportDirections.scrollIntoViewIfNeeded();
 
@@ -151,6 +153,7 @@ test.describe('Persistence, Export & Modal Dialogs (Tiers 1-4)', () => {
 
     const exportBtn = page.locator('#exportZipButton');
     await exportBtn.click();
+    await page.locator('#confirmExport').click();
     await page.waitForTimeout(500);
 
     await expect(page.locator('#status')).toHaveText(/Export ready|Exporting/);
@@ -189,17 +192,11 @@ test.describe('Persistence, Export & Modal Dialogs (Tiers 1-4)', () => {
       await page.waitForLoadState('networkidle');
     }
 
+    await page.locator('#exportZipButton').click();
+    await page.locator('#exportAngle').fill('');
     await page.locator('#addExportDirection').click();
-    const overlay = page.locator('#modalOverlay');
-    await expect(overlay).toBeVisible();
-
-    const input = page.locator('#modalInput');
-    await input.fill('abc');
-    await input.dispatchEvent('input');
-
-    await expect(page.locator('#modalError')).toContainText('Direction must be a number');
-    await expect(page.locator('#modalConfirmButton')).toBeDisabled();
-    await page.locator('#modalCancelButton').click();
+    await expect(page.locator('#exportError')).toContainText('Enter a direction');
+    await page.locator('#cancelExport').click();
   });
 
   test('Tier 2: Duplicate export direction rejected with alert', async ({ page }) => {
@@ -210,17 +207,11 @@ test.describe('Persistence, Export & Modal Dialogs (Tiers 1-4)', () => {
       await page.waitForLoadState('networkidle');
     }
 
+    await page.locator('#exportZipButton').click();
+    await page.locator('#exportAngle').fill('0');
     await page.locator('#addExportDirection').click();
-    const overlay = page.locator('#modalOverlay');
-    await expect(overlay).toBeVisible();
-
-    const input = page.locator('#modalInput');
-    await input.fill('0');
-    await input.dispatchEvent('input');
-
-    await expect(page.locator('#modalError')).toContainText('That direction is already selected');
-    await expect(page.locator('#modalConfirmButton')).toBeDisabled();
-    await page.locator('#modalCancelButton').click();
+    await expect(page.locator('#exportError')).toContainText('already selected');
+    await page.locator('#cancelExport').click();
   });
 
   test('Tier 2: Preventing removal of the last remaining export direction', async ({ page }) => {
@@ -231,6 +222,7 @@ test.describe('Persistence, Export & Modal Dialogs (Tiers 1-4)', () => {
       await page.waitForLoadState('networkidle');
     }
 
+    await page.locator('#exportZipButton').click();
     // Remove chips until 1 is left
     while ((await page.locator('#exportDirections .direction-chip').count()) > 1) {
       await page.locator('#exportDirections .direction-chip').first().locator('button[title="Remove direction"]').click();
@@ -239,10 +231,7 @@ test.describe('Persistence, Export & Modal Dialogs (Tiers 1-4)', () => {
 
     // Try removing the last one
     await page.locator('#exportDirections .direction-chip').first().locator('button[title="Remove direction"]').click();
-    const overlay = page.locator('#modalOverlay');
-    await expect(overlay).toBeVisible();
-    await expect(page.locator('#modalMessage')).toContainText('Select at least one export direction');
-    await page.locator('#modalConfirmButton').click();
+    await expect(page.locator('#exportError')).toContainText('Select at least one export direction');
 
     await expect(page.locator('#exportDirections .direction-chip')).toHaveCount(1);
   });

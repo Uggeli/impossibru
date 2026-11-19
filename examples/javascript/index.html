@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Impossibru sprite player</title>
+<style>
+  body { background:#191c24; color:white; font:1rem system-ui; margin:2rem auto; max-width:32rem; }
+  canvas { display:block; width:100%; image-rendering:pixelated; background:#101217; margin:1rem 0; }
+  label { margin-right:1rem; }
+</style>
+<h1>Sprite player</h1>
+<label>Clip <select id="clip"></select></label>
+<label>Direction <select id="angle"></select></label>
+<canvas width="480" height="320" data-atlas="../../dist/humanoid.json"></canvas>
+<p id="error" role="alert"></p>
+<script type="module">
+  import { loadSprite } from './sprite-player.js';
+  const canvas = document.querySelector('canvas');
+  const ctx = canvas.getContext('2d');
+  const clip = document.querySelector('#clip');
+  const angle = document.querySelector('#angle');
+  try {
+    const sprite = await loadSprite(canvas.dataset.atlas);
+    for (const name of Object.keys(sprite.animations)) clip.add(new Option(name));
+    let start;
+    function selectClip() {
+      start = performance.now();
+      angle.replaceChildren(...sprite.animations[clip.value].directions.map(d => new Option(d.angle + '°', d.angle)));
+    }
+    selectClip();
+    clip.onchange = selectClip;
+    ctx.imageSmoothingEnabled = false;
+    function paint(now) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      sprite.draw(ctx, { clip:clip.value, angle:Number(angle.value), elapsedMs:now-start,
+        x:canvas.width/2, y:canvas.height*0.8, scale:2 });
+      requestAnimationFrame(paint);
+    }
+    requestAnimationFrame(paint);
+  } catch (error) {
+    document.querySelector('#error').textContent = error.message;
+  }
+</script>
+</html>

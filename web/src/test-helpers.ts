@@ -12,24 +12,28 @@ export function setupTestEnvironment() {
   const idbStore = new Map<string, any>();
   const mockDb = {
     createObjectStore: () => {},
-    transaction: () => ({
-      objectStore: () => ({
-        put: (val: any, key: string) => {
-          idbStore.set(key, val);
-          const req: any = {};
-          setTimeout(() => req.onsuccess && req.onsuccess({ target: { result: key } }), 0);
-          return req;
-        },
-        get: (key: string) => {
-          const req: any = {};
-          setTimeout(() => {
-            req.result = idbStore.get(key);
-            req.onsuccess && req.onsuccess({ target: { result: req.result } });
-          }, 0);
-          return req;
-        },
-      }),
-    }),
+    close: () => {},
+    transaction: () => {
+      const tx: any = {
+        objectStore: () => ({
+          put: (val: any, key: string) => {
+            idbStore.set(key, val);
+            const req: any = {};
+            setTimeout(() => { req.onsuccess?.({target:{result:key}}); tx.oncomplete?.(); }, 0);
+            return req;
+          },
+          get: (key: string) => {
+            const req: any = {};
+            setTimeout(() => {
+              req.result = idbStore.get(key);
+              req.onsuccess && req.onsuccess({ target: { result: req.result } });
+            }, 0);
+            return req;
+          },
+        }),
+      };
+      return tx;
+    },
   };
 
   (globalThis as any).indexedDB = {

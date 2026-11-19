@@ -1,3 +1,6 @@
+import playerModule from '../../examples/javascript/sprite-player.js?raw';
+import playerPage from '../../examples/javascript/index.html?raw';
+import voxelDecoder from '../../examples/javascript/decode-voxels.js?raw';
 import yaml from 'js-yaml';
 import { zipSync, strToU8 } from 'fflate';
 import {
@@ -77,17 +80,81 @@ const errorInfo = (e: any) => {
   };
 };
 
-async function draft(d: ProjectDocument) {
-  sessionStorage.setItem('impossibru-project', JSON.stringify(d));
-  const db = await new Promise<IDBDatabase>((ok, no) => {
-    const q = indexedDB.open('impossibru', 1);
-    q.onupgradeneeded = () => q.result.createObjectStore('drafts');
-    q.onsuccess = () => ok(q.result);
-    q.onerror = () => no(q.error);
+interface DraftRecord {
+  document: ProjectDocument;
+  time: number;
+}
+
+async function draftDatabase() {
+  return new Promise<IDBDatabase>((resolve, reject) => {
+    const request = indexedDB.open('impossibru', 1);
+    request.onupgradeneeded = () => request.result.createObjectStore('drafts');
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
   });
-  db.transaction('drafts', 'readwrite')
-    .objectStore('drafts')
-    .put({ document: d, time: Date.now() }, 'current');
+}
+
+export async function readDraft(): Promise<DraftRecord | undefined> {
+  const db = await draftDatabase();
+  try {
+    return await new Promise<DraftRecord | undefined>((resolve, reject) => {
+      const request = db.transaction('drafts').objectStore('drafts').get('current');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  } finally {
+    db.close();
+  }
+}
+
+// Explicit project switches compare against the draft the user agreed to replace.
+export async function persistDraft(project: ProjectDocument, replaceRevision?: number | null) {
+  const serialized = JSON.stringify(project);
+  if (replaceRevision === undefined) {
+    sessionStorage.setItem('impossibru-project', serialized);
+    if (sessionStorage.getItem('impossibru-example') === 'true') return;
+  }
+  const db = await draftDatabase();
+  let revision = Date.now();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const transaction = db.transaction('drafts', 'readwrite');
+      const store = transaction.objectStore('drafts');
+      const request = store.get('current');
+      let conflict = false;
+      request.onsuccess = () => {
+        const expected = replaceRevision === undefined
+          ? sessionStorage.getItem('impossibru-revision')
+          : replaceRevision;
+        const existing = request.result as DraftRecord | undefined;
+        if (String(existing?.time ?? null) !== String(expected)) {
+          conflict = true;
+          transaction.abort();
+          return;
+        }
+        revision = Math.max(revision, (existing?.time ?? 0) + 1);
+        store.put({ document: JSON.parse(serialized), time: revision }, 'current');
+      };
+      transaction.oncomplete = () => {
+        sessionStorage.setItem('impossibru-revision', String(revision));
+        resolve();
+      };
+      transaction.onabort = () => {
+        if (conflict) {
+          handle = null;
+          reject(new Error('Recovery draft changed. Save a YAML copy to keep your work.'));
+        } else {
+          reject(transaction.error ?? new Error('Could not store the recovery draft.'));
+        }
+      };
+    });
+    if (replaceRevision !== undefined) {
+      sessionStorage.setItem('impossibru-example', 'false');
+      sessionStorage.setItem('impossibru-project', serialized);
+    }
+  } finally {
+    db.close();
+  }
 }
 
 export function autorigProjectFallback(
@@ -409,7 +476,7 @@ export async function browserRequest(path: string, options: any = {}) {
       });
     if (path === '/api/validate') {
       validateProject(d);
-      await draft(d);
+
       return response({
         valid: true,
         summary: {
@@ -479,13 +546,13 @@ export async function browserRequest(path: string, options: any = {}) {
         keys.sort((a: any, b: any) => a.frame - b.frame);
       }
       validateProject(d);
-      await draft(d);
+
       return response({ document: d });
     }
     if (path === '/api/rig/reparent') {
       const p = JSON.parse(options.body);
       const updated = reparent(d, p.bone, p.parent || null);
-      await draft(updated);
+
       return response({ document: updated });
     }
     if (path === '/api/rig/autorig' || path === '/api/autorig') {
@@ -493,7 +560,7 @@ export async function browserRequest(path: string, options: any = {}) {
       const preset = p.preset || 'humanoid';
       const updated = autorigProjectFallback(d, preset);
       validateProject(updated);
-      await draft(updated);
+
       return response({
         document: updated,
         project: updated,
@@ -517,14 +584,15 @@ export async function browserRequest(path: string, options: any = {}) {
           new Blob([text], { type: 'application/yaml' }),
           `${d.export?.name || 'project'}.yaml`
         );
-      await draft(d);
+
       return response({ saved: true, source_hash: 'browser' });
     }
     if (path === '/api/project/new') {
       const p = JSON.parse(options.body),
         n = p.filename.replace(/\.ya?ml$/i, '');
       const nd = starterProject(n);
-      await draft(nd);
+      await persistDraft(nd, p.replaceRevision ?? null);
+      handle = null;
       return response({
         document: nd,
         source_hash: 'browser',
@@ -539,47 +607,39 @@ export async function browserRequest(path: string, options: any = {}) {
 
 export async function openProject() {
   const picker = (window as any).showOpenFilePicker;
+  let candidate = null;
+  let file: File | null;
   if (picker) {
-    [handle] = await picker({
-      types: [
-        {
-          description: 'YAML project',
-          accept: { 'application/yaml': ['.yaml', '.yml'] },
-        },
-      ],
+    [candidate] = await picker.call(window, {
+      types: [{ description: 'YAML project', accept: { 'application/yaml': ['.yaml', '.yml'] } }]
     });
-    const file = await handle.getFile();
-    sessionStorage.setItem('impossibru-yaml', await file.text());
-    sessionStorage.removeItem('impossibru-project');
-    return true;
+    file = await candidate.getFile();
+  } else {
+    file = await new Promise<File | null>(resolve => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.yaml,.yml';
+      input.onchange = () => resolve(input.files?.[0] || null);
+      input.oncancel = () => resolve(null);
+      input.click();
+    });
   }
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = '.yaml,.yml';
-  return new Promise<boolean>((ok) => {
-    input.onchange = async () => {
-      if (!input.files?.[0]) return ok(false);
-      sessionStorage.setItem('impossibru-yaml', await input.files[0].text());
-      sessionStorage.removeItem('impossibru-project');
-      ok(true);
-    };
-    input.click();
-  });
+  if (!file) return null;
+  const project = yaml.load(await file.text()) as ProjectDocument;
+  validateProject(project);
+  return { document: project, handle: candidate };
+}
+
+export function setProjectHandle(next: any) {
+  handle = next;
 }
 
 export async function recoverDraft() {
-  const db = await new Promise<IDBDatabase>((ok, no) => {
-    const q = indexedDB.open('impossibru', 1);
-    q.onupgradeneeded = () => q.result.createObjectStore('drafts');
-    q.onsuccess = () => ok(q.result);
-    q.onerror = () => no(q.error);
-  });
-  const v: any = await new Promise((ok) => {
-    const q = db.transaction('drafts').objectStore('drafts').get('current');
-    q.onsuccess = () => ok(q.result);
-  });
-  if (!v) return false;
-  sessionStorage.setItem('impossibru-project', JSON.stringify(v.document));
+  const record = await readDraft();
+  if (!record) return false;
+  validateProject(record.document);
+  sessionStorage.setItem('impossibru-revision', String(record.time));
+  sessionStorage.setItem('impossibru-project', JSON.stringify(record.document));
   return true;
 }
 
@@ -593,7 +653,8 @@ function download(blob: Blob, name: string) {
 
 export async function exportProjectZip(
   d: ProjectDocument,
-  progress = (p: number) => {}
+  progress = (p: number) => {},
+  includePlayer = false
 ) {
   validateProject(d);
   const meta = metadata(d),
@@ -631,6 +692,11 @@ export async function exportProjectZip(
       [`${base}.json`]: strToU8(JSON.stringify(meta, null, 2) + '\n'),
       [`${base}.yaml`]: strToU8(yaml.dump(d, { noRefs: true, lineWidth: -1 })),
     };
+  if (includePlayer) {
+    files['player/index.html'] = strToU8(playerPage.replace('../../dist/humanoid.json', () => '../' + encodeURIComponent(base) + '.json'));
+    files['player/sprite-player.js'] = strToU8(playerModule);
+    files['player/decode-voxels.js'] = strToU8(voxelDecoder);
+  }
   download(
     new Blob([zipSync(files)] as any, { type: 'application/zip' }),
     `${base}.zip`

@@ -74,3 +74,50 @@ managing parts and palette colors, resizing grids, previewing isolated parts or
 the animated character, and saving the project. The editor binds only to
 localhost. Changes stay in memory until Save is pressed, and saving is refused
 if the YAML file changed externally or the edited project is invalid.
+
+## Use an exported sprite in JavaScript
+
+In the editor, choose **Export ZIP**, select your clips and directions, and check
+**Include JavaScript player and decoder**. Extract the ZIP, run
+`python3 -m http.server 8000` in the extracted directory, and open
+`http://localhost:8000/player/`. The sample plays the exported PNG and JSON
+in Canvas 2D with clip and direction selectors. Keep the YAML for future edits.
+
+For a game, copy the player module, atlas PNG, and atlas JSON into your project.
+This example assumes a canvas and a browser module script. Replace the filename
+and clip with ones from your export.
+
+```js
+import { loadSprite } from './player/sprite-player.js';
+
+const sprite = await loadSprite('./humanoid.json');
+const ctx = document.querySelector('canvas').getContext('2d');
+ctx.imageSmoothingEnabled = false;
+const start = performance.now();
+function frame(now) {
+  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  sprite.draw(ctx, { clip: 'walk', angle: 45, elapsedMs: now - start,
+    x: ctx.canvas.width / 2, y: ctx.canvas.height * 0.8, scale: 2 });
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+```
+
+The player selects the closest exported yaw, follows the clip timing and loop
+flag, and draws each frame at its pivot. To run the [repository demo](examples/javascript/index.html),
+build `examples/humanoid.yaml` into `dist`, serve the repository root, and open
+`/examples/javascript/`.
+
+For original 3D sources that contain packed `size` and `voxels` fields, the
+[voxel decoder](examples/javascript/decode-voxels.js) yields occupied cells in
+part-local grid coordinates. Subtract the part pivot when positioning cells
+relative to a bone. The editor's [Mundus examples](examples/mundus) use editable
+front, side, and back views and can be played through the atlas export above.
+
+```js
+import { decodeVoxels } from './player/decode-voxels.js';
+
+for (const { x, y, z, color } of decodeVoxels(project.parts.head, project.palette)) {
+  // Add a cell at (x, y, z) using your renderer and the source palette color.
+}
+```

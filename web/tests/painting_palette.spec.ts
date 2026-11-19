@@ -124,7 +124,7 @@ test.describe('Painting & Palette Workspace (Tiers 1-4)', () => {
   });
 
   test('Tier 1: Edit hex color in palette swatch', async ({ page }) => {
-    const colorInput = page.locator('.swatch input[type="color"]').first();
+    const colorInput = page.locator('#paletteEditor input[type="color"]').first();
     await expect(colorInput).toBeVisible();
     await colorInput.fill('#ff55aa');
     await colorInput.dispatchEvent('input');
@@ -135,7 +135,7 @@ test.describe('Painting & Palette Workspace (Tiers 1-4)', () => {
   });
 
   test('Tier 1: Rename palette character symbol across active model', async ({ page }) => {
-    const renameBtn = page.locator('.swatch button[title="Rename symbol"]').first();
+    const renameBtn = page.locator('#paletteEditor button[title="Rename symbol"]').first();
     await renameBtn.click();
     await respondModal(page, 'k');
 
@@ -183,7 +183,7 @@ test.describe('Painting & Palette Workspace (Tiers 1-4)', () => {
 
   test('Tier 2: Palette deletion blocked when color is currently used in a part', async ({ page }) => {
     // Color 'x' is used in the starter project
-    const removeBtn = page.locator('.swatch button[title="Delete color"]').first();
+    const removeBtn = page.locator('#paletteEditor button[title="Delete color"]').first();
     await removeBtn.click();
 
     // Modal alert is shown
@@ -204,7 +204,7 @@ test.describe('Painting & Palette Workspace (Tiers 1-4)', () => {
     await expect(page.locator('.swatch-char:has-text("u")')).toBeVisible();
 
     // Delete the unused color 'u'
-    const removeBtn = page.locator('.swatch:has-text("u") button[title="Delete color"]');
+    const removeBtn = page.locator('#paletteEditor button[title="Delete color"]');
     await removeBtn.click();
     await respondModal(page, true);
 
@@ -342,7 +342,7 @@ test.describe('Painting & Palette Workspace (Tiers 1-4)', () => {
     }
 
     // Rename 'm' to 'n'
-    const renameBtn = page.locator('.swatch:has-text("m") button[title="Rename symbol"]');
+    const renameBtn = page.locator('#paletteEditor button[title="Rename symbol"]');
     await renameBtn.click();
     await respondModal(page, 'n');
     await page.waitForTimeout(200);
@@ -379,7 +379,7 @@ test.describe('Painting & Palette Workspace (Tiers 1-4)', () => {
     await expect(page.locator('.swatch-char:has-text("c")')).toBeVisible();
 
     // 2. Set color hex
-    const colorInput = page.locator('.swatch:has-text("c") input[type="color"]');
+    const colorInput = page.locator('#paletteEditor input[type="color"]');
     await colorInput.fill('#3498db');
     await colorInput.dispatchEvent('input');
 
@@ -549,7 +549,7 @@ test.describe('Painting & Palette Workspace (Tiers 1-4)', () => {
     await expect(page.locator('.swatch-char:has-text("a")')).toBeVisible();
 
     // Move 'a' up
-    const moveUpBtn = page.locator('.swatch:has-text("a") .swatch-move-up');
+    const moveUpBtn = page.locator('#paletteEditor .swatch-move-up');
     await moveUpBtn.click();
     await page.waitForTimeout(100);
 
@@ -558,7 +558,7 @@ test.describe('Painting & Palette Workspace (Tiers 1-4)', () => {
     await expect(firstChar).toHaveText('a');
 
     // Move 'a' back down
-    const moveDownBtn = page.locator('.swatch:has-text("a") .swatch-move-down');
+    const moveDownBtn = page.locator('#paletteEditor .swatch-move-down');
     await moveDownBtn.click();
     await page.waitForTimeout(100);
 

@@ -1,5 +1,7 @@
 import './style.css';
-import { autoRig, browserRequest, exportProjectZip, openProject, recoverDraft, starterProject } from './runtime';
+import { load as parseYaml } from 'js-yaml';
+import { validateProject } from './engine';
+import { setProjectHandle, readDraft, persistDraft, autoRig, browserRequest, exportProjectZip, openProject, recoverDraft, starterProject } from './runtime';
 import {
   bresenhamLine,
   rectPoints,
@@ -21,6 +23,7 @@ import type { PartSpec, Color } from './types';
 const token = typeof location !== 'undefined' ? (new URLSearchParams(location.search).get('token') || '') : '';
 const $ = (id: string): any => document.getElementById(id);
 const clone = (value: any) => JSON.parse(JSON.stringify(value));
+const defaultDirections = [0, 45, 90, 135, 180, 225, 270, 315];
 const entries = (value: any): [string, any][] => Object.entries(value || {}) as [string, any][];
 const values = (value: any): any[] => Object.values(value || {}) as any[];
 const apiHeaders = { 'Content-Type': 'application/json', 'X-SpriteBuilder-Token': token };
@@ -28,7 +31,7 @@ const apiHeaders = { 'Content-Type': 'application/json', 'X-SpriteBuilder-Token'
 const state: any = {
   doc: null, sourceHash: '', summary: null, part: null, color: null, tool: 'pencil', mode: 'part',
   mirror: false,
-  dirty: false, valid: false, error: null, errorInfo: null, history: [], future: [],
+  revision: 0, dirty: false, valid: false, error: null, errorInfo: null, history: [], future: [],
   drawing: false, dragStart: null, dragCurrent: null, dragView: null,
   hoverView: null, hoverX: -1, hoverY: -1, lastCell: null,
   previewTimer: null, validateTimer: null, previewUrl: null, rigUrl: null, playing: null,
@@ -81,8 +84,7 @@ function selectedSpec(): PartSpec {
 }
 
 async function request(path: string, options: any = {}) {
-  if (!token) return browserRequest(path, options);
-  const response = await fetch(path, { ...options, headers: { ...apiHeaders, ...(options.headers || {}) } });
+  const response = !token ? await browserRequest(path, options) : await fetch(path, { ...options, headers: { ...apiHeaders, ...(options.headers || {}) } });
   if (!response.ok) {
     let body = { error: { message: `Request failed (${response.status})` } };
     try { body = await response.json(); } catch (_) {}
@@ -136,7 +138,7 @@ function restore(snapshot: any) {
   state.selectedChain = snapshot.chain;
   state.selectedClip = snapshot.clip || Object.keys(state.doc.animations || {})[0] || null;
   if (snapshot.mirror !== undefined) state.mirror = snapshot.mirror;
-  changed(false);
+  changed();
 }
 
 function snapshot() {
@@ -163,19 +165,18 @@ function redo() {
   restore(state.future.pop());
 }
 
-function changed(render = true) {
-  state.dirty = true;
-  if (render) renderAll(); else renderAll();
-  $('status').textContent = 'Unsaved changes';
-  $('saveButton').disabled = true;
-  clearTimeout(state.validateTimer);
-  state.validateTimer = setTimeout(validateAndPreview, 180);
+function changed() {
+  changedPreviewOnly();
+  renderAll();
 }
 
 function changedPreviewOnly() {
+  state.revision++;
+  state.valid = false;
   state.dirty = true;
   $('status').textContent = 'Unsaved changes';
   $('saveButton').disabled = true;
+  $('exportZipButton').disabled = true;
   clearTimeout(state.validateTimer);
   state.validateTimer = setTimeout(validateAndPreview, 180);
 }
@@ -186,7 +187,7 @@ function renderAll() {
   renderDimensions();
   renderCanvases();
   renderPreviewControls();
-  renderExportSettings();
+
   renderRig();
   updateButtons();
 }
@@ -369,7 +370,11 @@ function renderPalette() {
       deleteColor(char);
     };
 
-    item.append(colorPicker, hexInput, symbol, moveUp, moveDown, replaceBtn, rename, remove);
+    symbol.className = 'color-tile swatch-char';
+    symbol.style.backgroundColor = paletteHex(value);
+    symbol.setAttribute('aria-pressed', String(char === state.color));
+    item.append(symbol);
+    if (char === state.color) $('paletteEditor').replaceChildren(colorPicker, hexInput, moveUp, moveDown, replaceBtn, rename, remove);
     item.onclick = (e) => {
       if (e.target === item) {
         state.color = char;
@@ -397,7 +402,8 @@ function drawCanvas(view: string) {
   const grid = rows(view);
   const cols = grid[0].length;
   const rowsCount = grid.length;
-  const cell = Math.max(8, Math.min(24, Math.floor(300 / Math.max(cols, rowsCount))));
+  const available = canvas.parentElement!.clientWidth - 26;
+  const cell = Math.max(3, Math.floor(Math.min(available / cols, 320 / rowsCount)));
   const dpr = window.devicePixelRatio || 1;
 
   const logicalWidth = cols * cell;
@@ -565,7 +571,7 @@ function drawCanvas(view: string) {
 function renderPreviewControls() {
   document.querySelectorAll<HTMLElement>('[data-mode]').forEach(b => b.classList.toggle('active', b.dataset.mode === state.mode));
   $('animationControls').classList.toggle('hidden', state.mode !== 'character');
-  const clip = $('clip'), old = clip.value;
+  const clip = $('clip');
   clip.replaceChildren();
   entries(state.doc.animations || {}).forEach(([name]) => {
     const o = document.createElement('option');
@@ -573,12 +579,13 @@ function renderPreviewControls() {
     o.textContent = name;
     clip.append(o);
   });
-  if ([...clip.options].some(o => o.value === old)) clip.value = old;
+  clip.value = state.selectedClip;
   const spec = state.doc.animations?.[clip.value];
   if (spec) {
     $('frame').max = spec.frames - 1;
     if (+$('frame').value >= spec.frames) $('frame').value = 0;
     $('frameValue').value = $('frame').value;
+    $('timeValue').value = 'Frame ' + $('frame').value;
   }
   $('yawValue').value = $('yaw').value + '°';
 }
@@ -589,96 +596,72 @@ function updateButtons() {
   $('undoButtonRig').disabled = !state.history.length;
   $('redoButtonRig').disabled = !state.future.length;
   $('saveButton').disabled = !state.dirty || !state.valid;
+  $('exportZipButton').disabled = !state.valid;
   $('mirrorToggle')?.classList.toggle('active', !!state.mirror);
 }
 
 function ensureExportSettings() {
   state.doc.export ??= {};
-  state.doc.export.directions ??= [0, 45, 90, 135, 180, 225, 270, 315];
+  state.doc.export.directions ??= [...defaultDirections];
   return state.doc.export;
 }
 function selectedExportAnimations() {
   return ensureExportSettings().animations || Object.keys(state.doc.animations);
 }
 
+let exportChoice: { animations: string[]; directions: number[] };
 function renderExportSettings() {
-  const animations = $('exportAnimations'), directions = $('exportDirections');
-  if (!animations || !directions) return;
-  const settings = ensureExportSettings();
-  animations.replaceChildren();
-  const ah = document.createElement('h3');
-  ah.textContent = 'Animations';
-  animations.append(ah);
-  const selected = selectedExportAnimations();
-  Object.keys(state.doc.animations).forEach(name => {
-    const label = document.createElement('label');
-    label.className = 'export-choice';
-    const input = document.createElement('input');
-    input.type = 'checkbox';
-    input.checked = selected.includes(name);
-    input.onchange = async () => {
-      const current = selectedExportAnimations().slice();
-      if (!input.checked && current.length === 1) {
-        input.checked = true;
-        return modalAlert({ title: 'Export Setting', message: 'Select at least one animation for export.' });
-      }
-      checkpoint();
-      settings.animations = input.checked ? [...current, name].filter((v, i, a) => a.indexOf(v) === i) : current.filter(v => v !== name);
-      changed();
+  const clips = $('exportAnimations');
+  const angles = $('exportDirections');
+  clips.replaceChildren();
+  angles.replaceChildren();
+  for (const name of Object.keys(state.doc.animations)) {
+    const label = document.createElement('label'), check = document.createElement('input');
+    check.type = 'checkbox';
+    check.checked = exportChoice.animations.includes(name);
+    check.onchange = () => {
+      exportChoice.animations = check.checked ? [...exportChoice.animations,name] : exportChoice.animations.filter(item => item !== name);
+      $('confirmExport').disabled = !exportChoice.animations.length || !exportChoice.directions.length;
     };
-    label.append(input, document.createTextNode(name));
-    animations.append(label);
-  });
-
-  directions.replaceChildren();
-  const dh = document.createElement('h3');
-  dh.textContent = 'Directions (yaw)';
-  directions.append(dh);
-  const list = document.createElement('div');
-  list.className = 'direction-list';
-  settings.directions.forEach((angle: number, index: number) => {
+    label.append(check, name);
+    clips.append(label);
+  }
+  for (const angle of exportChoice.directions) {
+    const remove = document.createElement('button');
+    remove.textContent = angle + '° ×';
+    remove.title = 'Remove direction';
+    remove.setAttribute('aria-label', 'Remove direction ' + angle + ' degrees');
+    remove.onclick = () => {
+      if (exportChoice.directions.length === 1) {
+        $('exportError').textContent = 'Select at least one export direction.';
+        return;
+      }
+      exportChoice.directions = exportChoice.directions.filter(value => value !== angle);
+      $('exportError').textContent = '';
+      renderExportSettings();
+    };
     const chip = document.createElement('span');
     chip.className = 'direction-chip';
-    chip.append(document.createTextNode(`${angle}°`));
-    const remove = document.createElement('button');
-    remove.textContent = '×';
-    remove.title = 'Remove direction';
-    remove.onclick = () => {
-      if (settings.directions.length === 1) {
-        return modalAlert({ title: 'Export Setting', message: 'Select at least one export direction.' });
-      }
-      checkpoint();
-      settings.directions.splice(index, 1);
-      changed();
-    };
     chip.append(remove);
-    list.append(chip);
-  });
-  directions.append(list);
+    angles.append(chip);
+  }
+  $('confirmExport').disabled = !exportChoice.animations.length || !exportChoice.directions.length;
 }
-
-async function addExportDirection() {
-  const raw = await modalPrompt({
-    title: 'Add Export Direction',
-    defaultValue: '0',
-    placeholder: 'Yaw angle in degrees',
-    validate: (v) => {
-      const val = Number(v);
-      if (!Number.isFinite(val) || v.trim() === '') return 'Direction must be a number.';
-      const angle = ((val % 360) + 360) % 360;
-      const settings = ensureExportSettings();
-      if (settings.directions.some((d: number) => ((d % 360) + 360) % 360 === angle)) {
-        return 'That direction is already selected.';
-      }
-      return null;
-    }
-  });
-  if (raw === null) return;
-  const value = Number(raw);
-  const angle = ((value % 360) + 360) % 360, settings = ensureExportSettings();
-  checkpoint();
-  settings.directions.push(angle);
-  changed();
+function addExportDirection() {
+  const input = $('exportAngle');
+  if (!Number.isFinite(input.valueAsNumber)) {
+    $('exportError').textContent = 'Enter a direction in degrees.';
+    return;
+  }
+  const angle = ((input.valueAsNumber % 360) + 360) % 360;
+  if (exportChoice.directions.some(value => ((value % 360) + 360) % 360 === angle)) {
+    $('exportError').textContent = 'Direction already selected.';
+    return;
+  }
+  exportChoice.directions.push(angle);
+  input.value = '';
+  $('exportError').textContent = '';
+  renderExportSettings();
 }
 
 function writeCell(view: string, x: number, y: number, char: string) {
@@ -1087,14 +1070,32 @@ function clearError() {
 }
 
 async function validateAndPreview() {
+  const revision = state.revision;
+  const project = state.doc;
   try {
     await request('/api/validate', { method: 'POST', body: JSON.stringify({ document: state.doc }) });
+    if (revision !== state.revision || project !== state.doc) return;
     state.valid = true;
+    if (!token && state.dirty) {
+      try {
+        await persistDraft(project);
+      } catch (error: any) {
+        if (revision === state.revision && project === state.doc) {
+          $('status').textContent = error.message;
+          updateButtons();
+          schedulePreview(0);
+        }
+        return;
+      }
+      if (revision !== state.revision || project !== state.doc) return;
+    }
     clearError();
     $('saveButton').disabled = !state.dirty;
     $('status').textContent = state.dirty ? 'Unsaved changes' : 'Ready';
     schedulePreview(0);
+    if (state.workspace !== 'parts') updateRigPreview();
   } catch (error: any) {
+    if (revision !== state.revision || project !== state.doc) return;
     state.valid = false;
     showError(error.message, error.body?.error);
     $('saveButton').disabled = true;
@@ -1109,7 +1110,7 @@ function schedulePreview(delay = 120) {
 
 async function updatePreview() {
   if (!state.valid) return;
-  const stage = document.querySelector('.preview-stage');
+  const stage = $('previewImage').parentElement;
   stage?.classList.add('busy');
   const payload = {
     document: state.doc,
@@ -1134,7 +1135,6 @@ async function updatePreview() {
       img.src = data.dataUrl || ('data:image/png;base64,' + data.png);
     }
     img.dataset.rendered = 'true';
-    clearError();
   } catch (error: any) {
     showError(error.message);
   } finally {
@@ -1144,15 +1144,27 @@ async function updatePreview() {
 
 async function save() {
   if (!state.valid) return;
+  const revision = state.revision, project = state.doc;
   try {
     const payload = await (await request('/api/project', { method: 'PUT', body: JSON.stringify({ document: state.doc, source_hash: state.sourceHash }) })).json();
+    if (project !== state.doc) return;
     state.sourceHash = payload.source_hash;
+    if (revision !== state.revision) return;
+    clearError();
     state.dirty = false;
     $('status').textContent = 'Saved';
     updateButtons();
   } catch (error: any) {
     showError(error.message);
     if (error.status === 409) $('status').textContent = 'File changed externally';
+  }
+}
+
+function stopPlayback() {
+  if (state.playing) {
+    clearInterval(state.playing);
+    state.playing = null;
+    $('play').textContent = 'Play';
   }
 }
 
@@ -1175,7 +1187,15 @@ async function newProject() {
   if (!filename) return;
 
   try {
-    const payload = await (await request('/api/project/new', { method: 'POST', body: JSON.stringify({ filename }) })).json();
+    const previous = token ? undefined : await readDraft();
+    if (previous && (sessionStorage.getItem('impossibru-example') === 'true' || String(previous.time) !== sessionStorage.getItem('impossibru-revision')) && !await modalConfirm({
+      title: 'Replace recovery draft?',
+      message: 'Create ' + filename + ' in place of the recovery draft for ' + (previous.document.export?.name || 'your project') + '?'
+    })) return;
+    const payload = await (await request('/api/project/new', {
+      method: 'POST',
+      body: JSON.stringify({ filename, replaceRevision: previous?.time ?? null })
+    })).json();
     state.doc = payload.document;
     state.sourceHash = payload.source_hash;
     state.summary = payload.summary;
@@ -1187,6 +1207,8 @@ async function newProject() {
     state.history = [];
     state.future = [];
     state.dirty = false;
+    $('keepExample').hidden = true; $('exampleHint').hidden = true;
+    stopPlayback();
     state.valid = true;
     $('filePath').textContent = payload.summary.path;
     $('status').textContent = 'Created';
@@ -1198,8 +1220,16 @@ async function newProject() {
   }
 }
 
+function updateHandleVisibility() {
+  const animate = state.workspace === 'animate';
+  $('handlesControl').hidden = !animate;
+  $('rigOverlay').parentElement.classList.toggle('hide-handles', animate && !$('showHandles').checked);
+}
+
 function setWorkspace(name: string) {
+  if (name !== state.workspace) stopPlayback();
   state.workspace = name;
+  updateHandleVisibility();
   document.querySelectorAll<HTMLElement>('[data-workspace]').forEach(b => b.classList.toggle('active', b.dataset.workspace === name));
   document.querySelectorAll('[data-pane=parts]').forEach(e => e.classList.toggle('hidden', name !== 'parts'));
   document.querySelectorAll('[data-pane=rigging]').forEach(e => e.classList.toggle('hidden', name === 'parts'));
@@ -1207,6 +1237,9 @@ function setWorkspace(name: string) {
   $('clipSection').classList.toggle('hidden', name !== 'animate');
   $('timeline').classList.toggle('hidden', name !== 'animate');
   $('rigModeTitle').textContent = name === 'animate' ? 'Animate' : 'Rest pose';
+  $('transport').hidden = name !== 'animate';
+  (name === 'animate' ? $('transport') : $('animationControls')).append($('play'));
+  if (name === 'parts') renderCanvases();
   renderRig();
   schedulePreview(0);
 }
@@ -1215,10 +1248,11 @@ function boneChildren(name: string) {
   return entries(state.doc.rig?.bones || {}).filter(([, b]) => b.parent === name).map(([n]) => n);
 }
 
+const collapsedBones = new Set<string>();
 function appendBoneTree(parent: string | null, container: HTMLElement, depth = 0) {
   entries(state.doc.rig?.bones || {}).filter(([, b]) => (b.parent || null) === (parent || null)).forEach(([name]) => {
     const b = document.createElement('button');
-    b.style.paddingLeft = (10 + depth * 14) + 'px';
+    b.className = 'bone-name';
     b.textContent = name;
     b.classList.toggle('active', name === state.selectedBone);
     b.onclick = () => {
@@ -1227,8 +1261,23 @@ function appendBoneTree(parent: string | null, container: HTMLElement, depth = 0
       renderRig();
       schedulePreview(0);
     };
-    container.append(b);
-    appendBoneTree(name, container, depth + 1);
+    const row = document.createElement('div');
+    row.className = 'bone-row';
+    row.style.paddingLeft = depth * 10 + 'px';
+    if (boneChildren(name).length) {
+      const toggle = document.createElement('button');
+      toggle.textContent = collapsedBones.has(name) ? '▸' : '▾';
+      toggle.setAttribute('aria-label','Toggle children of ' + name);
+      toggle.setAttribute('aria-expanded',String(!collapsedBones.has(name)));
+      toggle.onclick = () => {
+        if (!collapsedBones.delete(name)) collapsedBones.add(name);
+        renderRig();
+      };
+      row.append(toggle);
+    }
+    row.append(b);
+    container.append(row);
+    if (!collapsedBones.has(name)) appendBoneTree(name, container, depth + 1);
   });
 }
 
@@ -1245,7 +1294,11 @@ function vecEditor(title: string, value: any, onchange: (i: number, val: number)
     input.title = axis;
     input.value = String(Number(value?.[i] || 0));
     input.onchange = () => onchange(i, +input.value);
-    wrap.append(input);
+    const axisLabel = document.createElement('label');
+    axisLabel.textContent = axis;
+    input.setAttribute('aria-label', title + ' ' + axis);
+    axisLabel.append(input);
+    wrap.append(axisLabel);
   });
   return wrap;
 }
@@ -1318,6 +1371,7 @@ function renderRig() {
     b.textContent = name;
     b.classList.toggle('active', name === state.selectedClip);
     b.onclick = () => {
+      stopPlayback();
       state.selectedClip = name;
       $('clip').value = name;
       $('frame').value = 0;
@@ -1370,8 +1424,8 @@ function renderBoneInspector() {
       changed();
     }));
   };
-  editVec(['translation'], 'T', 'translation');
-  editVec(['rotation'], 'R°', 'rotation');
+  editVec(['translation'], 'Position', 'translation');
+  editVec(['rotation'], 'Rotation °', 'rotation');
   if (state.workspace === 'rig') {
     const partLabel = document.createElement('label');
     partLabel.textContent = 'Attached part ';
@@ -1387,8 +1441,8 @@ function renderBoneInspector() {
     partLabel.append(select);
     box.append(partLabel);
     spec.attachment ??= {};
-    editVec(['attachment', 'translation'], 'AT');
-    editVec(['attachment', 'rotation'], 'AR°');
+    editVec(['attachment', 'translation'], 'Attachment position');
+    editVec(['attachment', 'rotation'], 'Attachment rotation °');
     if (spec.part) {
       const pivot = state.doc.parts[spec.part].pivot || [0, 0, 0];
       box.append(vecEditor('Pivot', pivot, (i, value) => {
@@ -2167,6 +2221,18 @@ function renderTimeline() {
   const clip = state.doc?.animations?.[state.selectedClip];
   if (!clip) return;
   const tracks = state.selectedChain ? ['target', 'pole', 'weight'] : ['translation', 'rotation'];
+  const ruler = document.createElement('div');
+  ruler.className = 'time-ruler';
+  ruler.style.setProperty('--frames', clip.frames);
+  ruler.append(document.createElement('span'));
+  for (let frame = 0; frame < clip.frames; frame++) {
+    const tick = document.createElement('button');
+    tick.textContent = String(frame);
+    tick.setAttribute('aria-label', 'Frame ' + frame);
+    tick.onclick = () => setAnimationFrame(frame);
+    ruler.append(tick);
+  }
+  timeline.append(ruler);
   tracks.forEach(track => {
     const trackId = state.selectedChain ? `${state.selectedChain}.${track}` : `${state.selectedBone}.${track}`;
     const isMuted = state.mutedTracks.has(trackId);
@@ -2205,6 +2271,7 @@ function renderTimeline() {
       const b = document.createElement('button');
       const hasKey = keys.some((k: any) => k.frame === f);
       b.textContent = hasKey ? '◆' : '';
+      b.setAttribute('aria-label', track + ', frame ' + f + (hasKey ? ', keyframe' : ''));
       b.classList.toggle('key', hasKey);
       b.classList.toggle('current', f === +$('frame').value);
 
@@ -2333,6 +2400,15 @@ function renderTimeline() {
     }
     timeline.append(row);
   });
+  const current = timeline.querySelector('.track-row .current');
+  if (current) {
+    const marker = document.createElement('div');
+    marker.className = 'playhead';
+    marker.style.left = (current.offsetLeft + current.offsetWidth / 2) + 'px';
+    marker.style.height = (timeline.lastElementChild.offsetTop + timeline.lastElementChild.offsetHeight - ruler.offsetTop) + 'px';
+    marker.style.top = ruler.offsetTop + 'px';
+    timeline.append(marker);
+  }
 }
 
 function uniqueObjectName(map: any, base: string) {
@@ -2675,6 +2751,7 @@ function setAnimationFrame(frameIndex: number) {
   const f = ((frameIndex % frames) + frames) % frames;
   $('frame').value = String(f);
   $('frameValue').value = String(f);
+  $('timeValue').value = 'Frame ' + f;
   renderTimeline();
   renderBoneInspector();
   renderKeyInspector();
@@ -2756,6 +2833,7 @@ function drawOverlay() {
     circle.setAttribute('class', 'rig-joint' + (b.name === state.selectedBone ? ' selected' : ''));
     circle.onclick = () => {
       state.selectedBone = b.name;
+      for (let parent = state.doc.rig.bones[b.name].parent; parent; parent = state.doc.rig.bones[parent].parent) collapsedBones.delete(parent);
       state.selectedChain = null;
       renderRig();
     };
@@ -2766,6 +2844,19 @@ function drawOverlay() {
     text.setAttribute('y', String(b.y - 2));
     text.setAttribute('class', 'rig-label');
     text.textContent = b.name;
+    text.classList.toggle('selected', b.name === state.selectedBone);
+    circle.setAttribute('tabindex', '0');
+    circle.setAttribute('role', 'button');
+    circle.setAttribute('aria-label', b.name);
+    circle.onkeydown = event => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        event.stopPropagation();
+        circle.dispatchEvent(new MouseEvent('click'));
+      }
+    };
+    circle.onfocus = () => text.classList.add('focused');
+    circle.onblur = () => text.classList.remove('focused');
     svg.append(text);
   });
 }
@@ -2774,9 +2865,9 @@ function bindRigDrag(element: SVGElement, kind: string, name: string, depth: num
   element.onpointerdown = e => {
     e.preventDefault();
     e.stopPropagation();
-    checkpoint();
     const pointerId = e.pointerId, dragStart = structuredClone(state.doc);
     element.setPointerCapture(pointerId);
+    let moved = false;
     let pending = false, latest: any = null;
     const apply = async () => {
       if (pending || !latest) return;
@@ -2800,7 +2891,12 @@ function bindRigDrag(element: SVGElement, kind: string, name: string, depth: num
     };
     element.onpointermove = move => {
       if (!element.hasPointerCapture(move.pointerId)) return;
-      const rect = $('rigOverlay').getBoundingClientRect(), screen = [(move.clientX - rect.left) * state.overlay.width / rect.width, (move.clientY - rect.top) * state.overlay.height / rect.height];
+      if (!moved) checkpoint();
+      moved = true;
+      const matrix = $('rigOverlay').getScreenCTM();
+      if (!matrix) return;
+      const point = new DOMPoint(move.clientX, move.clientY).matrixTransform(matrix.inverse());
+      const screen = [point.x, point.y];
       latest = [screen[0] - (state.overlay.offset?.[0] || 0), screen[1] - (state.overlay.offset?.[1] || 0)];
       element.setAttribute('cx', String(screen[0]));
       element.setAttribute('cy', String(screen[1]));
@@ -2811,6 +2907,7 @@ function bindRigDrag(element: SVGElement, kind: string, name: string, depth: num
       element.onpointerup = null;
       element.onpointercancel = null;
       if (element.hasPointerCapture(pointerId)) element.releasePointerCapture(pointerId);
+      if (!moved) return;
       while (pending || latest) await new Promise(resolve => setTimeout(resolve, 10));
       changed();
       await updateRigPreview(true);
@@ -2828,12 +2925,53 @@ if (typeof document !== 'undefined') {
     renderCanvases();
   });
 
+const views = document.querySelector<HTMLElement>('.views')!;
+let focusedView = 'front', manualFocus = false;
+const compactLayout = matchMedia('(max-width:1279px)');
+function arrangeViews() {
+  const focus = manualFocus || compactLayout.matches;
+  views.classList.toggle('focus-layout', focus);
+  $('allViews').hidden = !manualFocus || compactLayout.matches;
+  for (const button of views.querySelectorAll<HTMLButtonElement>('[data-focus]')) {
+    const article = button.closest('article')!;
+    article.classList.toggle('primary-view', button.dataset.focus === focusedView);
+    article.onclick = event => {
+      if (event.target === button || (focus && !article.classList.contains('primary-view'))) {
+        focusedView = button.dataset.focus!;
+        manualFocus = !compactLayout.matches;
+        arrangeViews();
+      }
+    };
+  }
+  if (state.doc) {
+    renderCanvases();
+    if (state.workspace === 'animate') renderTimeline();
+  }
+}
+$('allViews').onclick = () => { manualFocus = false; arrangeViews(); };
+window.addEventListener('resize',arrangeViews);
+arrangeViews();
+$('dismissHint').onclick = () => $('exampleHint').hidden = true;
+$('expandPreview').onclick = () => {
+  const expanded = document.querySelector('.preview-panel')!.classList.toggle('expanded');
+  $('openPreviewImage').hidden = expanded;
+  $('expandPreview').textContent = expanded ? 'Collapse preview' : 'Expand preview';
+  $('expandPreview').setAttribute('aria-expanded',String(expanded));
+  arrangeViews();
+};
+$('openPreviewImage').onclick = () => $('expandPreview').click();
 // Mode Selection
 document.querySelectorAll<HTMLElement>('[data-mode]').forEach(button => button.onclick = () => {
   state.mode = button.dataset.mode;
   renderPreviewControls();
   schedulePreview(0);
 });
+
+$('showHandles').checked = sessionStorage.getItem('impossibru-show-handles') !== 'false';
+$('showHandles').onchange = () => {
+  sessionStorage.setItem('impossibru-show-handles', String($('showHandles').checked));
+  updateHandleVisibility();
+};
 
 // Workspace Selection
 document.querySelectorAll<HTMLElement>('[data-workspace]').forEach(button => button.onclick = () => setWorkspace(button.dataset.workspace || 'parts'));
@@ -2862,11 +3000,28 @@ $('redoButton').onclick = redo;
 $('saveButton').onclick = save;
 $('newProjectButton').onclick = newProject;
 $('addExportDirection').onclick = addExportDirection;
-$('exportZipButton').onclick = async () => {
+$('exportZipButton').onclick = () => {
   if (!state.valid) return;
+  exportChoice = {
+    animations: [...(state.doc.export?.animations || Object.keys(state.doc.animations))],
+    directions: [...(state.doc.export?.directions || defaultDirections)]
+  };
+  $('exportAngle').value = '';
+  $('exportError').textContent = '';
+  renderExportSettings();
+  $('exportDialog').showModal();
+};
+$('cancelExport').onclick = () => $('exportDialog').close();
+$('confirmExport').onclick = async () => {
+  $('exportDialog').close();
+  if (JSON.stringify(exportChoice.animations) !== JSON.stringify(selectedExportAnimations()) || JSON.stringify(exportChoice.directions) !== JSON.stringify(ensureExportSettings().directions)) {
+    checkpoint();
+    Object.assign(ensureExportSettings(), exportChoice);
+    changed();
+  }
   try {
     $('status').textContent = 'Exporting…';
-    await exportProjectZip(state.doc, p => { $('status').textContent = `Exporting ${p}%`; });
+    await exportProjectZip(clone(state.doc), p => { $('status').textContent = `Exporting ${p}%`; }, $('includePlayer').checked);
     $('status').textContent = 'Export ready';
   } catch (error: any) {
     showError(error.message);
@@ -2899,6 +3054,7 @@ $('yaw').oninput = () => {
   if (state.workspace !== 'parts') updateRigPreview();
 };
 $('clip').onchange = () => {
+  stopPlayback();
   state.selectedClip = $('clip').value;
   renderPreviewControls();
   renderRig();
@@ -2907,14 +3063,6 @@ $('clip').onchange = () => {
 $('frame').oninput = () => {
   setAnimationFrame(+$('frame').value);
 };
-
-function stopPlayback() {
-  if (state.playing) {
-    clearInterval(state.playing);
-    state.playing = null;
-    $('play').textContent = 'Play';
-  }
-}
 
 function startPlayback() {
   const clip = state.doc?.animations?.[state.selectedClip || $('clip').value];
@@ -2955,6 +3103,7 @@ window.addEventListener('keydown', event => {
   const modalOverlay = $('modalOverlay');
   const isModalOpen = modalOverlay && !modalOverlay.classList.contains('hidden');
 
+  if (!state.doc || $('exportDialog').open || $('examplesDialog').open) return;
   if (isInput || isModalOpen) {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
       event.preventDefault();
@@ -2973,7 +3122,7 @@ window.addEventListener('keydown', event => {
   } else if ((event.ctrlKey || event.metaKey) && key === 'y') {
     event.preventDefault();
     redo();
-  } else if (event.code === 'Space' || event.key === ' ') {
+  } else if ((event.code === 'Space' || event.key === ' ') && (!target?.closest('button') || state.workspace === 'animate' && !target.closest('.time-ruler, #transport, .workspace-tabs'))) {
     event.preventDefault();
     togglePlayback();
   } else if (event.key === '[') {
@@ -3027,29 +3176,144 @@ window.addEventListener('beforeunload', event => {
 
 if (typeof window !== 'undefined' && typeof document !== 'undefined' && $('welcome')) {
   const welcome = $('welcome');
-  $('welcomeNew').onclick = () => {
-    sessionStorage.setItem('impossibru-project', JSON.stringify(starterProject('untitled')));
-    welcome.classList.add('hidden');
-    location.reload();
-  };
+  async function enter(project: any, example = false, recovered = false, fileHandle = null) {
+    try {
+      validateProject(project);
+      if (!example && !recovered) {
+        const previous = await readDraft();
+        if (previous && !await modalConfirm({
+          title: 'Replace recovery draft?',
+          message: 'Use this project in place of ' + (previous.document.export?.name || 'your last project') + '?'
+        })) return;
+        await persistDraft(project, previous?.time ?? null);
+      } else {
+        sessionStorage.setItem('impossibru-project', JSON.stringify(project));
+        sessionStorage.setItem('impossibru-example', String(example));
+      }
+      setProjectHandle(fileHandle);
+      welcome.classList.add('hidden');
+      await load();
+      if (recovered) $('saveButton').disabled = false;
+      if (example) {
+        const mundusName = mundusExamples.get(project.export?.name);
+        if (mundusName) {
+          $('filePath').textContent = 'Mundus · ' + mundusName;
+          $('yaw').value = '60';
+        } else {
+          state.part = 'torso';
+          state.color = 'b';
+        }
+        state.mode = 'character';
+        state.selectedClip = 'walk';
+        renderAll();
+        schedulePreview(0);
+        $('exampleHint').hidden = !!mundusName;
+        $('keepExample').hidden = false;
+        if (!matchMedia('(prefers-reduced-motion: reduce)').matches) startPlayback();
+      }
+    } catch (error: any) {
+      await modalAlert(error.message);
+    }
+  }
+  $('welcomeNew').onclick = () => enter(starterProject('untitled'));
   $('welcomeOpen').onclick = async () => {
-    const opened = await openProject();
-    if (opened) location.reload();
+    try {
+      const opened = await openProject();
+      if (opened) await enter(opened.document, false, false, opened.handle);
+    } catch (error: any) {
+      if (error.name !== 'AbortError') await modalAlert(error.message);
+    }
   };
   $('welcomeRecover').onclick = async () => {
-    if (await recoverDraft()) location.reload();
+    try {
+      if (await recoverDraft()) await enter(JSON.parse(sessionStorage.getItem('impossibru-project')!), false, true);
+    } catch (error: any) {
+      await modalAlert(error.message);
+    }
   };
-  $('welcomeExample').onclick = async () => {
-    const text = await (await fetch('./example.yaml')).text();
-    sessionStorage.setItem('impossibru-yaml', text);
-    location.reload();
+  $('keepExample').onclick = async () => {
+    try {
+      validateProject(state.doc);
+      const prior = await readDraft();
+      if (prior && !await modalConfirm({
+        title: 'Keep example as project',
+        message: 'Replace the recovery draft for ' + (prior.document.export?.name || 'your project') + '?'
+      })) return;
+      await persistDraft(state.doc, prior?.time ?? null);
+      $('keepExample').hidden = true;
+    } catch (error: any) {
+      await modalAlert(error.message);
+    }
   };
-
-  if (token || sessionStorage.getItem('impossibru-project') || sessionStorage.getItem('impossibru-yaml')) {
-    welcome.classList.add('hidden');
+  const mundusExamples = new Map<string, string>();
+  function addExampleRow(list: HTMLElement, labelText: string, idForSex: (sex: string) => string) {
+    const row = document.createElement('div');
+    const label = document.createElement('strong');
+    label.textContent = labelText;
+    row.append(label);
+    for (const sex of ['Female', 'Male']) {
+      const id = idForSex(sex.toLowerCase());
+      const name = labelText + ' · ' + sex;
+      mundusExamples.set(id, name);
+      const link = document.createElement('a');
+      link.href = '?example=' + id;
+      link.target = '_blank';
+      link.rel = 'noopener';
+      link.textContent = sex;
+      link.setAttribute('aria-label', name);
+      row.append(link);
+    }
+    list.append(row);
   }
+  for (const species of ['Deer', 'Wolf', 'Rabbit', 'Mus']) {
+    addExampleRow($('animalList'), species, sex => species.toLowerCase() + '-' + sex);
+  }
+  for (const age of ['Baby', 'Juvenile', 'Adult', 'Elder']) {
+    addExampleRow($('orcList'), age + ' orc', sex => 'orc-' + sex + '-' + age.toLowerCase());
+  }
+  document.querySelectorAll<HTMLButtonElement>('[data-open-examples]').forEach(button => {
+    button.onclick = () => $('examplesDialog').showModal();
+  });
 
-  load();
+  async function openExample(id: string) {
+    try {
+      const humanoid = id === 'humanoid';
+      const url = humanoid ? './example.yaml' : new URL(`../../examples/mundus/${id}.json`, import.meta.url);
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Could not load example ' + id);
+      await enter(humanoid ? parseYaml(await response.text()) : await response.json(), true);
+      if (welcome.classList.contains('hidden')) history.replaceState(null, '', location.pathname);
+    } catch (error: any) {
+      await modalAlert(error.message);
+    }
+  }
+  $('welcomeExample').onclick = () => openExample('humanoid');
+  const query = new URLSearchParams(location.search);
+  const exampleId = query.get('example') ?? query.get('animal');
+  if (!token && (exampleId === 'humanoid' || mundusExamples.has(exampleId))) {
+    openExample(exampleId);
+  } else if (token || sessionStorage.getItem('impossibru-project') || sessionStorage.getItem('impossibru-yaml')) {
+    welcome.classList.add('hidden');
+    // Bind older sessions to their matching single-slot draft before editing.
+    const resume = async () => {
+      if (!token && !sessionStorage.getItem('impossibru-revision')) {
+        const record = await readDraft();
+        if (record && JSON.stringify(record.document) === sessionStorage.getItem('impossibru-project')) {
+          sessionStorage.setItem('impossibru-revision', String(record.time));
+        }
+      }
+      await load();
+    };
+    resume().catch(error => showError(error.message));
+    $('keepExample').hidden = !!token || sessionStorage.getItem('impossibru-example') !== 'true';
+  } else {
+    readDraft().then(record => {
+      if (record) {
+        $('welcomeRecover').hidden = false;
+        $('welcomeRecover').textContent = 'Resume ' + (record.document.export?.name || 'project') + ' · ' + new Date(record.time).toLocaleString();
+        $('welcomeRecover').focus();
+      }
+    }).catch(() => {});
+  }
 }
 }
-

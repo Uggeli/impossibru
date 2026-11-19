@@ -192,7 +192,7 @@ test.describe('Challenger 2 M5 Phase 2 Adversarial E2E: Canvas, Palette, Timelin
 
     // 1. Add keyframe at frame 0
     await f0.click();
-    const rotX = vecInput(page, 'R°', 'X');
+    const rotX = vecInput(page, 'Rotation °', 'X');
     await rotX.fill('35');
     await rotX.dispatchEvent('change');
     await page.waitForTimeout(100);
@@ -222,7 +222,7 @@ test.describe('Challenger 2 M5 Phase 2 Adversarial E2E: Canvas, Palette, Timelin
 
     // 1. Add keyframe at frame 2
     await f2.click();
-    const rotZ = vecInput(page, 'R°', 'Z');
+    const rotZ = vecInput(page, 'Rotation °', 'Z');
     await rotZ.fill('60');
     await rotZ.dispatchEvent('change');
     await page.waitForTimeout(100);
