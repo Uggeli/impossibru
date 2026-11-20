@@ -21,6 +21,22 @@ FX = ("fx_question", "fx_exclaim", "fx_stars", "fx_note", "fx_swirl")
 FACES = ("happy", "blink", "wink", "excited", "thinking", "surprised", "content", "worried")
 
 
+CLIPS = {  # name: (loop, faces that must appear, props that must appear)
+    "idle": (True, {"face_happy", "face_blink"}, set()),
+    "float": (True, set(), {"fx_swirl"}),
+    "listen": (True, set(), set()),
+    "think": (True, {"face_thinking"}, {"fx_question"}),
+    "present": (False, {"face_excited"}, {"fx_stars"}),
+    "confused": (False, {"face_worried"}, {"fx_question"}),
+    "celebrate": (False, {"face_excited"}, {"fx_stars"}),
+    "wave": (False, {"face_wink"}, set()),
+    "surprised": (False, {"face_surprised"}, {"fx_exclaim"}),
+    "content": (True, {"face_content"}, {"fx_note"}),
+    "thumbs_up": (False, {"face_wink"}, set()),
+    "walk": (True, set(), set()),
+}
+
+
 def face_pixels(project, clip, pose, yaw, frame=0):
     """Pixels that change when the face sticker is hidden."""
     parts = active_parts(project, clip, frame)
@@ -88,6 +104,42 @@ class QioTests(unittest.TestCase):
         self.assertEqual(raw["rig"]["bones"]["fx_swirl"]["parent"], "root")
         for n in FX[:4]:
             self.assertEqual(raw["rig"]["bones"][n]["parent"], "head")
+
+    def test_clip_vocabulary(self):
+        _, project = load()
+        for name, (loop, faces, props) in CLIPS.items():
+            with self.subTest(clip=name):
+                self.assertIn(name, project.clips)
+                clip = project.clips[name]
+                self.assertEqual(clip.loop, loop)
+                frames = [active_parts(project, clip, f) for f in range(clip.frames)]
+                self.assertLessEqual(faces, {p["face"] for p in frames})
+                for fx in FX:
+                    shown = [f for f, p in enumerate(frames) if p[fx] is not None]
+                    if fx in props:
+                        self.assertTrue(shown, fx)
+                    else:
+                        self.assertEqual(shown, [], fx)
+
+    def test_no_clip_touches_frame_border(self):
+        _, project = load()
+        for name in project.export.animations:
+            clip = project.clips[name]
+            for f in range(clip.frames):
+                pose = evaluate_pose(project, clip, f)
+                parts = active_parts(project, clip, f)
+                for yaw in project.export.directions:
+                    a = np.asarray(render_pose(project, pose, yaw, parts=parts))[:, :, 3]
+                    edge = max(a[0].max(), a[-1].max(), a[:, 0].max(), a[:, -1].max())
+                    self.assertEqual(edge, 0, (name, f, yaw))
+
+    def test_no_root_yaw(self):
+        raw, _ = load()
+        for name, clip in raw["animations"].items():
+            bones = clip["bones"]
+            self.assertNotIn("rotation", bones.get("root", {}), name)
+            for k in bones.get("torso", {}).get("rotation", []):
+                self.assertLessEqual(abs(k["value"][1]), 10, name)
 
     def test_qio_shell_enabled(self):
         raw, _ = load()

@@ -633,7 +633,7 @@ animations:
   thumbs_up:
     frames: 8
     fps: 8
-    loop: true
+    loop: false
     bones:
       root:
         translation:
@@ -701,6 +701,1020 @@ animations:
           - 0
           - 0
           - 12
+          interpolation: smooth
+  float:
+    frames: 8
+    fps: 8
+    loop: true
+    bones:
+      root:
+        translation:
+        - frame: 0
+          value:
+          - 0
+          - 3
+          - 0
+          interpolation: smooth
+        - frame: 4
+          value:
+          - 0
+          - 4
+          - 0
+          interpolation: smooth
+      left_leg:
+        rotation:
+        - frame: 0
+          value:
+          - -35
+          - 0
+          - 4
+          interpolation: smooth
+      right_leg:
+        rotation:
+        - frame: 0
+          value:
+          - -25
+          - 0
+          - -4
+          interpolation: smooth
+        - frame: 4
+          value:
+          - -35
+          - 0
+          - -4
+          interpolation: smooth
+      left_foot:
+        rotation:
+        - frame: 0
+          value:
+          - 35
+          - 0
+          - 0
+          interpolation: smooth
+      right_foot:
+        rotation:
+        - frame: 0
+          value:
+          - 30
+          - 0
+          - 0
+          interpolation: smooth
+      left_arm:
+        rotation:
+        - frame: 0
+          value: &id003
+          - -55
+          - 0
+          - 0
+          interpolation: smooth
+      right_arm:
+        rotation:
+        - frame: 0
+          value:
+          - 0
+          - 0
+          - -25
+          interpolation: smooth
+        - frame: 4
+          value:
+          - 0
+          - 0
+          - -35
+          interpolation: smooth
+      head:
+        rotation:
+        - frame: 0
+          value:
+          - 0
+          - 0
+          - -2
+          interpolation: smooth
+        - frame: 4
+          value:
+          - 0
+          - 0
+          - 2
+          interpolation: smooth
+      antenna:
+        rotation:
+        - frame: 0
+          value:
+          - -10
+          - 0
+          - 0
+          interpolation: smooth
+        - frame: 4
+          value:
+          - 10
+          - 0
+          - 0
+          interpolation: smooth
+      fx_swirl:
+        rotation:
+        - frame: 0
+          value: &id002
+          - 0
+          - 0
+          - 0
+          interpolation: linear
+        - frame: 7
+          value:
+          - 0
+          - 315
+          - 0
+          interpolation: linear
+        part:
+        - frame: 0
+          value: fx_swirl
+  listen:
+    frames: 8
+    fps: 8
+    loop: true
+    bones:
+      root:
+        translation:
+        - frame: 0
+          value: *id002
+          interpolation: smooth
+        - frame: 4
+          value:
+          - 0
+          - -0.4
+          - 0
+          interpolation: smooth
+      head:
+        rotation:
+        - frame: 0
+          value:
+          - 0
+          - 0
+          - 9
+          interpolation: smooth
+        - frame: 4
+          value:
+          - 0
+          - 0
+          - 12
+          interpolation: smooth
+      right_arm:
+        rotation:
+        - frame: 0
+          value:
+          - -166.0
+          - 0
+          - -16.2
+          interpolation: smooth
+      left_arm:
+        rotation:
+        - frame: 0
+          value: *id003
+          interpolation: smooth
+      face:
+        part:
+        - frame: 0
+          value: face_happy
+        - frame: 6
+          value: face_blink
+        - frame: 7
+          value: face_happy
+      antenna:
+        rotation:
+        - frame: 0
+          value:
+          - 0
+          - 0
+          - -8
+          interpolation: smooth
+        - frame: 4
+          value:
+          - 0
+          - 0
+          - 8
+          interpolation: smooth
+  think:
+    frames: 10
+    fps: 8
+    loop: true
+    bones:
+      root:
+        translation:
+        - frame: 0
+          value: *id002
+          interpolation: smooth
+        - frame: 5
+          value:
+          - 0
+          - -0.4
+          - 0
+          interpolation: smooth
+      head:
+        rotation:
+        - frame: 0
+          value:
+          - -6
+          - 0
+          - -8
+          interpolation: smooth
+        - frame: 5
+          value:
+          - -6
+          - 0
+          - -11
+          interpolation: smooth
+      right_arm:
+        rotation:
+        - frame: 0
+          value:
+          - -99.7
+          - 0
+          - 44.6
+          interpolation: smooth
+      left_arm:
+        rotation:
+        - frame: 0
+          value: *id003
+          interpolation: smooth
+      face:
+        part:
+        - frame: 0
+          value: face_thinking
+      fx_question:
+        translation:
+        - frame: 0
+          value: *id002
+          interpolation: smooth
+        - frame: 5
+          value:
+          - 0
+          - 1
+          - 0
+          interpolation: smooth
+        part:
+        - frame: 0
+          value: null
+        - frame: 2
+          value: fx_question
+      antenna:
+        rotation:
+        - frame: 0
+          value:
+          - 0
+          - 0
+          - 6
+          interpolation: smooth
+        - frame: 5
+          value:
+          - 0
+          - 0
+          - -6
+          interpolation: smooth
+  present:
+    frames: 10
+    fps: 10
+    loop: false
+    bones:
+      root:
+        translation:
+        - frame: 0
+          value: *id002
+          interpolation: smooth
+        - frame: 2
+          value:
+          - 0
+          - -0.8
+          - 0
+          interpolation: smooth
+        - frame: 4
+          value:
+          - 0
+          - 1.2
+          - 0
+          interpolation: smooth
+        - frame: 6
+          value: *id002
+          interpolation: smooth
+      left_arm:
+        rotation:
+        - frame: 0
+          value: *id003
+          interpolation: smooth
+        - frame: 4
+          value:
+          - -114.2
+          - 0
+          - 7.8
+          interpolation: smooth
+      right_arm:
+        rotation:
+        - frame: 0
+          value:
+          - 0
+          - 0
+          - -4
+          interpolation: smooth
+        - frame: 4
+          value:
+          - -111.8
+          - 0
+          - 13.1
+          interpolation: smooth
+      head:
+        rotation:
+        - frame: 0
+          value: *id002
+          interpolation: smooth
+        - frame: 4
+          value:
+          - 6
+          - 0
+          - 4
+          interpolation: smooth
+      face:
+        part:
+        - frame: 0
+          value: face_happy
+        - frame: 3
+          value: face_excited
+      fx_stars:
+        part:
+        - frame: 0
+          value: null
+        - frame: 3
+          value: fx_stars
+      antenna:
+        rotation:
+        - frame: 0
+          value: *id002
+          interpolation: smooth
+        - frame: 4
+          value:
+          - -16
+          - 0
+          - 0
+          interpolation: smooth
+        - frame: 7
+          value:
+          - 8
+          - 0
+          - 0
+          interpolation: smooth
+        - frame: 9
+          value: *id002
+          interpolation: smooth
+  confused:
+    frames: 10
+    fps: 10
+    loop: false
+    bones:
+      torso:
+        translation:
+        - frame: 0
+          value: *id002
+          interpolation: smooth
+        - frame: 3
+          value:
+          - 0
+          - 0.6
+          - 0
+          interpolation: smooth
+        - frame: 9
+          value:
+          - 0
+          - 0.3
+          - 0
+          interpolation: smooth
+      left_arm:
+        rotation:
+        - frame: 0
+          value: *id003
+          interpolation: smooth
+        - frame: 3
+          value:
+          - -68.2
+          - 0
+          - 61.7
+          interpolation: smooth
+      right_arm:
+        rotation:
+        - frame: 0
+          value:
+          - 0
+          - 0
+          - -4
+          interpolation: smooth
+        - frame: 3
+          value:
+          - -68.2
+          - 0
+          - -61.7
+          interpolation: smooth
+      head:
+        rotation:
+        - frame: 0
+          value: *id002
+          interpolation: smooth
+        - frame: 3
+          value:
+          - 0
+          - 0
+          - -12
+          interpolation: smooth
+        - frame: 9
+          value:
+          - 0
+          - 0
+          - -9
+          interpolation: smooth
+      face:
+        part:
+        - frame: 0
+          value: face_happy
+        - frame: 2
+          value: face_worried
+      fx_question:
+        part:
+        - frame: 0
+          value: null
+        - frame: 3
+          value: fx_question
+      antenna:
+        rotation:
+        - frame: 0
+          value: *id002
+          interpolation: smooth
+        - frame: 3
+          value:
+          - 0
+          - 0
+          - 18
+          interpolation: smooth
+        - frame: 6
+          value:
+          - 0
+          - 0
+          - -8
+          interpolation: smooth
+        - frame: 9
+          value:
+          - 0
+          - 0
+          - 4
+          interpolation: smooth
+  celebrate:
+    frames: 12
+    fps: 12
+    loop: false
+    bones:
+      root:
+        translation:
+        - frame: 0
+          value: *id002
+          interpolation: smooth
+        - frame: 2
+          value:
+          - 0
+          - -1.5
+          - 0
+          interpolation: smooth
+        - frame: 5
+          value:
+          - 0
+          - 4
+          - 0
+          interpolation: smooth
+        - frame: 8
+          value:
+          - 0
+          - 1
+          - 0
+          interpolation: smooth
+        - frame: 9
+          value:
+          - 0
+          - -1
+          - 0
+          interpolation: smooth
+        - frame: 11
+          value: *id002
+          interpolation: smooth
+      left_leg:
+        rotation:
+        - frame: 0
+          value: *id002
+          interpolation: smooth
+        - frame: 2
+          value:
+          - -20
+          - 0
+          - 0
+          interpolation: smooth
+        - frame: 5
+          value:
+          - -35
+          - 0
+          - 6
+          interpolation: smooth
+        - frame: 8
+          value:
+          - -10
+          - 0
+          - 0
+          interpolation: smooth
+        - frame: 10
+          value: *id002
+          interpolation: smooth
+      right_leg:
+        rotation:
+        - frame: 0
+          value: *id002
+          interpolation: smooth
+        - frame: 2
+          value:
+          - -20
+          - 0
+          - 0
+          interpolation: smooth
+        - frame: 5
+          value:
+          - -35
+          - 0
+          - -6
+          interpolation: smooth
+        - frame: 8
+          value:
+          - -10
+          - 0
+          - 0
+          interpolation: smooth
+        - frame: 10
+          value: *id002
+          interpolation: smooth
+      left_foot:
+        rotation:
+        - frame: 0
+          value: *id002
+          interpolation: smooth
+        - frame: 5
+          value:
+          - 35
+          - 0
+          - 0
+          interpolation: smooth
+        - frame: 9
+          value: *id002
+          interpolation: smooth
+      right_foot:
+        rotation:
+        - frame: 0
+          value: *id002
+          interpolation: smooth
+        - frame: 5
+          value:
+          - 35
+          - 0
+          - 0
+          interpolation: smooth
+        - frame: 9
+          value: *id002
+          interpolation: smooth
+      left_arm:
+        rotation:
+        - frame: 0
+          value: *id003
+          interpolation: smooth
+        - frame: 3
+          value:
+          - -164.7
+          - 0
+          - 56.2
+          interpolation: smooth
+        - frame: 9
+          value:
+          - -161.6
+          - 0
+          - 62.2
+          interpolation: smooth
+        - frame: 11
+          value: *id003
+          interpolation: smooth
+      right_arm:
+        rotation:
+        - frame: 0
+          value:
+          - 0
+          - 0
+          - -4
+          interpolation: smooth
+        - frame: 3
+          value:
+          - -164.7
+          - 0
+          - -56.2
+          interpolation: smooth
+        - frame: 9
+          value:
+          - -161.6
+          - 0
+          - -62.2
+          interpolation: smooth
+        - frame: 11
+          value:
+          - 0
+          - 0
+          - -4
+          interpolation: smooth
+      head:
+        rotation:
+        - frame: 0
+          value: *id002
+          interpolation: smooth
+        - frame: 2
+          value:
+          - 8
+          - 0
+          - 0
+          interpolation: smooth
+        - frame: 5
+          value:
+          - -8
+          - 0
+          - 0
+          interpolation: smooth
+        - frame: 9
+          value: *id002
+          interpolation: smooth
+      face:
+        part:
+        - frame: 0
+          value: face_happy
+        - frame: 3
+          value: face_excited
+        - frame: 11
+          value: face_happy
+      fx_stars:
+        part:
+        - frame: 0
+          value: null
+        - frame: 4
+          value: fx_stars
+        - frame: 11
+          value: null
+      antenna:
+        rotation:
+        - frame: 0
+          value: *id002
+          interpolation: smooth
+        - frame: 2
+          value:
+          - 14
+          - 0
+          - 0
+          interpolation: smooth
+        - frame: 5
+          value:
+          - -20
+          - 0
+          - 0
+          interpolation: smooth
+        - frame: 8
+          value:
+          - 10
+          - 0
+          - 0
+          interpolation: smooth
+        - frame: 11
+          value: *id002
+          interpolation: smooth
+  wave:
+    frames: 12
+    fps: 10
+    loop: false
+    bones:
+      root:
+        translation:
+        - frame: 0
+          value: *id002
+          interpolation: smooth
+        - frame: 6
+          value:
+          - 0
+          - 0.4
+          - 0
+          interpolation: smooth
+        - frame: 11
+          value: *id002
+          interpolation: smooth
+      right_arm:
+        rotation:
+        - frame: 0
+          value:
+          - 0
+          - 0
+          - -4
+          interpolation: smooth
+        - frame: 2
+          value:
+          - -168.7
+          - 0
+          - -44.4
+          interpolation: smooth
+        - frame: 4
+          value:
+          - -171.5
+          - 0
+          - -19.1
+          interpolation: smooth
+        - frame: 6
+          value:
+          - -168.7
+          - 0
+          - -44.4
+          interpolation: smooth
+        - frame: 8
+          value:
+          - -171.5
+          - 0
+          - -19.1
+          interpolation: smooth
+        - frame: 11
+          value:
+          - 0
+          - 0
+          - -4
+          interpolation: smooth
+      left_arm:
+        rotation:
+        - frame: 0
+          value: *id003
+          interpolation: smooth
+      head:
+        rotation:
+        - frame: 0
+          value: *id002
+          interpolation: smooth
+        - frame: 4
+          value:
+          - 0
+          - 0
+          - -8
+          interpolation: smooth
+        - frame: 9
+          value:
+          - 0
+          - 0
+          - -5
+          interpolation: smooth
+        - frame: 11
+          value: *id002
+          interpolation: smooth
+      face:
+        part:
+        - frame: 0
+          value: face_happy
+        - frame: 4
+          value: face_wink
+        - frame: 8
+          value: face_happy
+      antenna:
+        rotation:
+        - frame: 0
+          value: *id002
+          interpolation: smooth
+        - frame: 3
+          value:
+          - 0
+          - 0
+          - 12
+          interpolation: smooth
+        - frame: 6
+          value:
+          - 0
+          - 0
+          - -12
+          interpolation: smooth
+        - frame: 9
+          value:
+          - 0
+          - 0
+          - 8
+          interpolation: smooth
+        - frame: 11
+          value: *id002
+          interpolation: smooth
+  surprised:
+    frames: 10
+    fps: 10
+    loop: false
+    bones:
+      root:
+        translation:
+        - frame: 0
+          value: *id002
+          interpolation: smooth
+        - frame: 2
+          value:
+          - 0
+          - 2
+          - -1.5
+          interpolation: smooth
+        - frame: 4
+          value:
+          - 0
+          - 0
+          - -1.5
+          interpolation: smooth
+        - frame: 5
+          value:
+          - 0
+          - -0.6
+          - -1.5
+          interpolation: smooth
+        - frame: 7
+          value:
+          - 0
+          - 0
+          - -1.5
+          interpolation: smooth
+      left_arm:
+        rotation:
+        - frame: 0
+          value: *id003
+          interpolation: smooth
+        - frame: 2
+          value:
+          - -141.3
+          - 0
+          - 51.3
+          interpolation: smooth
+        - frame: 7
+          value:
+          - -99.5
+          - 0
+          - 44.6
+          interpolation: smooth
+      right_arm:
+        rotation:
+        - frame: 0
+          value:
+          - 0
+          - 0
+          - -4
+          interpolation: smooth
+        - frame: 2
+          value:
+          - -141.3
+          - 0
+          - -51.3
+          interpolation: smooth
+        - frame: 7
+          value:
+          - -99.5
+          - 0
+          - -44.6
+          interpolation: smooth
+      head:
+        rotation:
+        - frame: 0
+          value: *id002
+          interpolation: smooth
+        - frame: 2
+          value:
+          - -10
+          - 0
+          - 0
+          interpolation: smooth
+        - frame: 6
+          value:
+          - -4
+          - 0
+          - 0
+          interpolation: smooth
+      face:
+        part:
+        - frame: 0
+          value: face_happy
+        - frame: 1
+          value: face_surprised
+      fx_exclaim:
+        part:
+        - frame: 0
+          value: null
+        - frame: 1
+          value: fx_exclaim
+        - frame: 9
+          value: null
+      antenna:
+        rotation:
+        - frame: 0
+          value: *id002
+          interpolation: smooth
+        - frame: 2
+          value:
+          - -25
+          - 0
+          - 0
+          interpolation: smooth
+        - frame: 5
+          value:
+          - 15
+          - 0
+          - 0
+          interpolation: smooth
+        - frame: 8
+          value:
+          - -5
+          - 0
+          - 0
+          interpolation: smooth
+  content:
+    frames: 12
+    fps: 6
+    loop: true
+    bones:
+      torso:
+        rotation:
+        - frame: 0
+          value:
+          - 0
+          - 0
+          - -4
+          interpolation: smooth
+        - frame: 6
+          value:
+          - 0
+          - 0
+          - 4
+          interpolation: smooth
+      head:
+        rotation:
+        - frame: 0
+          value:
+          - 0
+          - 0
+          - -6
+          interpolation: smooth
+        - frame: 6
+          value:
+          - 0
+          - 0
+          - 6
+          interpolation: smooth
+      left_arm:
+        rotation:
+        - frame: 0
+          value: *id003
+          interpolation: smooth
+      right_arm:
+        rotation:
+        - frame: 0
+          value:
+          - 0
+          - 0
+          - -2
+          interpolation: smooth
+        - frame: 6
+          value:
+          - 0
+          - 0
+          - -8
+          interpolation: smooth
+      face:
+        part:
+        - frame: 0
+          value: face_content
+      fx_note:
+        translation:
+        - frame: 0
+          value: *id002
+          interpolation: smooth
+        - frame: 6
+          value:
+          - 0
+          - 1.5
+          - 0
+          interpolation: smooth
+        part:
+        - frame: 0
+          value: fx_note
+        - frame: 4
+          value: null
+        - frame: 6
+          value: fx_note
+        - frame: 10
+          value: null
+      antenna:
+        rotation:
+        - frame: 0
+          value:
+          - 0
+          - 0
+          - 10
+          interpolation: smooth
+        - frame: 6
+          value:
+          - 0
+          - 0
+          - -10
           interpolation: smooth
 export:
   name: qio

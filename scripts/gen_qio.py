@@ -376,6 +376,134 @@ def part_key(frame, value):
     return {"frame": frame, "value": value}
 
 
+def aim(dx, dy, dz):
+    """Arm rotation [x, 0, z] that points a hanging (-Y) arm along torso-space direction (dx, dy, dz).
+
+    Rotation order is X then Z (euler XYZ); x is kept in (-270, 90] so raising swings forward."""
+    n = math.sqrt(dx * dx + dy * dy + dz * dz)
+    dx, dy, dz = dx / n, dy / n, dz / n
+    z = math.asin(max(-1.0, min(1.0, dx)))
+    c = math.cos(z)
+    x = math.degrees(math.atan2(-dz / c, -dy / c)) if c > 1e-6 else 0.0
+    if x > 90:
+        x -= 360
+    return [round(x, 1), 0, round(math.degrees(z), 1)]
+
+
+def show(spans, part, frames):
+    """Part keys that show `part` on frames [a, b) for each (a, b) in spans, hidden elsewhere."""
+    keys = {0: None}
+    for a, b in spans:
+        if b < frames:
+            keys[b] = None
+    for a, b in spans:
+        keys[a] = part
+    return [part_key(f, v) for f, v in sorted(keys.items())]
+
+
+TABLET_ARM = [-55, 0, 0]  # left arm holding the tablet in front (rest pose for most clips)
+
+
+def assistant_clips():
+    """The AI-assistant vocabulary (see docs/superpowers/specs/2026-11-20-qio-expressions-vocabulary-design.md)."""
+    zero = [0, 0, 0]
+    lin = "linear"
+    return {
+        "float": {"frames": 8, "fps": 8, "loop": True, "bones": {
+            "root": {"translation": [key(0, [0, 3, 0]), key(4, [0, 4, 0])]},
+            "left_leg": {"rotation": [key(0, [-35, 0, 4])]},
+            "right_leg": {"rotation": [key(0, [-25, 0, -4]), key(4, [-35, 0, -4])]},
+            "left_foot": {"rotation": [key(0, [35, 0, 0])]},
+            "right_foot": {"rotation": [key(0, [30, 0, 0])]},
+            "left_arm": {"rotation": [key(0, TABLET_ARM)]},
+            "right_arm": {"rotation": [key(0, [0, 0, -25]), key(4, [0, 0, -35])]},
+            "head": {"rotation": [key(0, [0, 0, -2]), key(4, [0, 0, 2])]},
+            "antenna": {"rotation": [key(0, [-10, 0, 0]), key(4, [10, 0, 0])]},
+            "fx_swirl": {"rotation": [key(0, zero, lin), key(7, [0, 315, 0], lin)],
+                         "part": [part_key(0, "fx_swirl")]},
+        }},
+        "listen": {"frames": 8, "fps": 8, "loop": True, "bones": {
+            "root": {"translation": [key(0, zero), key(4, [0, -0.4, 0])]},
+            "head": {"rotation": [key(0, [0, 0, 9]), key(4, [0, 0, 12])]},
+            "right_arm": {"rotation": [key(0, aim(-0.3, 1, 0.25))]},
+            "left_arm": {"rotation": [key(0, TABLET_ARM)]},
+            "face": {"part": [part_key(0, "face_happy"), part_key(6, "face_blink"), part_key(7, "face_happy")]},
+            "antenna": {"rotation": [key(0, [0, 0, -8]), key(4, [0, 0, 8])]},
+        }},
+        "think": {"frames": 10, "fps": 8, "loop": True, "bones": {
+            "root": {"translation": [key(0, zero), key(5, [0, -0.4, 0])]},
+            "head": {"rotation": [key(0, [-6, 0, -8]), key(5, [-6, 0, -11])]},
+            "right_arm": {"rotation": [key(0, aim(0.7, 0.12, 0.7))]},
+            "left_arm": {"rotation": [key(0, TABLET_ARM)]},
+            "face": {"part": [part_key(0, "face_thinking")]},
+            "fx_question": {"translation": [key(0, zero), key(5, [0, 1, 0])],
+                            "part": show([(2, 10)], "fx_question", 10)},
+            "antenna": {"rotation": [key(0, [0, 0, 6]), key(5, [0, 0, -6])]},
+        }},
+        "present": {"frames": 10, "fps": 10, "loop": False, "bones": {
+            "root": {"translation": [key(0, zero), key(2, [0, -0.8, 0]), key(4, [0, 1.2, 0]), key(6, zero)]},
+            "left_arm": {"rotation": [key(0, TABLET_ARM), key(4, aim(0.15, 0.45, 1))]},
+            "right_arm": {"rotation": [key(0, [0, 0, -4]), key(4, aim(0.25, 0.4, 1))]},
+            "head": {"rotation": [key(0, zero), key(4, [6, 0, 4])]},
+            "face": {"part": [part_key(0, "face_happy"), part_key(3, "face_excited")]},
+            "fx_stars": {"part": show([(3, 10)], "fx_stars", 10)},
+            "antenna": {"rotation": [key(0, zero), key(4, [-16, 0, 0]), key(7, [8, 0, 0]), key(9, zero)]},
+        }},
+        "confused": {"frames": 10, "fps": 10, "loop": False, "bones": {
+            "torso": {"translation": [key(0, zero), key(3, [0, 0.6, 0]), key(9, [0, 0.3, 0])]},
+            "left_arm": {"rotation": [key(0, TABLET_ARM), key(3, aim(1, -0.2, 0.5))]},
+            "right_arm": {"rotation": [key(0, [0, 0, -4]), key(3, aim(-1, -0.2, 0.5))]},
+            "head": {"rotation": [key(0, zero), key(3, [0, 0, -12]), key(9, [0, 0, -9])]},
+            "face": {"part": [part_key(0, "face_happy"), part_key(2, "face_worried")]},
+            "fx_question": {"part": show([(3, 10)], "fx_question", 10)},
+            "antenna": {"rotation": [key(0, zero), key(3, [0, 0, 18]), key(6, [0, 0, -8]), key(9, [0, 0, 4])]},
+        }},
+        "celebrate": {"frames": 12, "fps": 12, "loop": False, "bones": {
+            "root": {"translation": [key(0, zero), key(2, [0, -1.5, 0]), key(5, [0, 4, 0]),
+                                     key(8, [0, 1, 0]), key(9, [0, -1, 0]), key(11, zero)]},
+            "left_leg": {"rotation": [key(0, zero), key(2, [-20, 0, 0]), key(5, [-35, 0, 6]), key(8, [-10, 0, 0]), key(10, zero)]},
+            "right_leg": {"rotation": [key(0, zero), key(2, [-20, 0, 0]), key(5, [-35, 0, -6]), key(8, [-10, 0, 0]), key(10, zero)]},
+            "left_foot": {"rotation": [key(0, zero), key(5, [35, 0, 0]), key(9, zero)]},
+            "right_foot": {"rotation": [key(0, zero), key(5, [35, 0, 0]), key(9, zero)]},
+            "left_arm": {"rotation": [key(0, TABLET_ARM), key(3, aim(0.85, 0.55, 0.15)), key(9, aim(0.9, 0.45, 0.15)), key(11, TABLET_ARM)]},
+            "right_arm": {"rotation": [key(0, [0, 0, -4]), key(3, aim(-0.85, 0.55, 0.15)), key(9, aim(-0.9, 0.45, 0.15)), key(11, [0, 0, -4])]},
+            "head": {"rotation": [key(0, zero), key(2, [8, 0, 0]), key(5, [-8, 0, 0]), key(9, zero)]},
+            "face": {"part": [part_key(0, "face_happy"), part_key(3, "face_excited"), part_key(11, "face_happy")]},
+            "fx_stars": {"part": show([(4, 11)], "fx_stars", 12)},
+            "antenna": {"rotation": [key(0, zero), key(2, [14, 0, 0]), key(5, [-20, 0, 0]), key(8, [10, 0, 0]), key(11, zero)]},
+        }},
+        "wave": {"frames": 12, "fps": 10, "loop": False, "bones": {
+            "root": {"translation": [key(0, zero), key(6, [0, 0.4, 0]), key(11, zero)]},
+            "right_arm": {"rotation": [key(0, [0, 0, -4]), key(2, aim(-0.75, 0.75, 0.15)), key(4, aim(-0.35, 1, 0.15)),
+                                       key(6, aim(-0.75, 0.75, 0.15)), key(8, aim(-0.35, 1, 0.15)), key(11, [0, 0, -4])]},
+            "left_arm": {"rotation": [key(0, TABLET_ARM)]},
+            "head": {"rotation": [key(0, zero), key(4, [0, 0, -8]), key(9, [0, 0, -5]), key(11, zero)]},
+            "face": {"part": [part_key(0, "face_happy"), part_key(4, "face_wink"), part_key(8, "face_happy")]},
+            "antenna": {"rotation": [key(0, zero), key(3, [0, 0, 12]), key(6, [0, 0, -12]), key(9, [0, 0, 8]), key(11, zero)]},
+        }},
+        "surprised": {"frames": 10, "fps": 10, "loop": False, "bones": {
+            "root": {"translation": [key(0, zero), key(2, [0, 2, -1.5]), key(4, [0, 0, -1.5]), key(5, [0, -0.6, -1.5]),
+                                     key(7, [0, 0, -1.5])]},
+            "left_arm": {"rotation": [key(0, TABLET_ARM), key(2, aim(0.8, 0.5, 0.4)), key(7, aim(0.6, 0.1, 0.6))]},
+            "right_arm": {"rotation": [key(0, [0, 0, -4]), key(2, aim(-0.8, 0.5, 0.4)), key(7, aim(-0.6, 0.1, 0.6))]},
+            "head": {"rotation": [key(0, zero), key(2, [-10, 0, 0]), key(6, [-4, 0, 0])]},
+            "face": {"part": [part_key(0, "face_happy"), part_key(1, "face_surprised")]},
+            "fx_exclaim": {"part": show([(1, 9)], "fx_exclaim", 10)},
+            "antenna": {"rotation": [key(0, zero), key(2, [-25, 0, 0]), key(5, [15, 0, 0]), key(8, [-5, 0, 0])]},
+        }},
+        "content": {"frames": 12, "fps": 6, "loop": True, "bones": {
+            "torso": {"rotation": [key(0, [0, 0, -4]), key(6, [0, 0, 4])]},
+            "head": {"rotation": [key(0, [0, 0, -6]), key(6, [0, 0, 6])]},
+            "left_arm": {"rotation": [key(0, TABLET_ARM)]},
+            "right_arm": {"rotation": [key(0, [0, 0, -2]), key(6, [0, 0, -8])]},
+            "face": {"part": [part_key(0, "face_content")]},
+            "fx_note": {"translation": [key(0, zero), key(6, [0, 1.5, 0])],
+                        "part": show([(0, 4), (6, 10)], "fx_note", 12)},
+            "antenna": {"rotation": [key(0, [0, 0, 10]), key(6, [0, 0, -10])]},
+        }},
+    }
+
+
 def build():
     parts = {
         "head": head(), "antenna": antenna(), "torso": torso(), "backpack": backpack(),
@@ -428,7 +556,7 @@ def build():
             "head": {"rotation": [key(0, [0, 0, -3]), key(4, [0, 0, 3])]},
             "antenna": {"rotation": [key(0, [-14, 0, 6]), key(2, [8, 0, 0]), key(4, [-14, 0, -6]), key(6, [8, 0, 0])]},
         }},
-        "thumbs_up": {"frames": 8, "fps": 8, "loop": True, "bones": {
+        "thumbs_up": {"frames": 8, "fps": 8, "loop": False, "bones": {
             "root": {"translation": [key(0, zero), key(4, [0, 0.5, 0])]},
             "right_arm": {"rotation": [key(0, [-60, 0, -150]), key(4, [-60, 0, -135])]},
             "left_arm": {"rotation": [key(0, [-55, 0, 0])]},
@@ -437,6 +565,7 @@ def build():
             "antenna": {"rotation": [key(0, [0, 0, -12]), key(4, [0, 0, 12])]},
         }},
     }
+    animations.update(assistant_clips())
     return {
         "palette": PALETTE, "parts": parts, "rig": {"bones": bones}, "animations": animations,
         "export": {"name": "qio", "size": [128, 168], "scale": 3, "origin": [64, 160],
