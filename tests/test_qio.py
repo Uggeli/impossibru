@@ -7,11 +7,25 @@ import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from test_shell import assert_shell_parity  # noqa: E402
 
-from spritebuilder.animation import active_parts  # noqa: E402
+import numpy as np  # noqa: E402
+
+from spritebuilder.animation import active_parts, evaluate_pose  # noqa: E402
+from spritebuilder.render import camera_yaw, render_pose  # noqa: E402
 from spritebuilder.project import compile_project  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 QIO = ROOT / "examples" / "qio.yaml"
+
+
+FACES = ("happy", "blink", "wink", "excited", "thinking", "surprised", "content", "worried")
+
+
+def face_pixels(project, clip, pose, yaw, frame=0):
+    """Pixels that change when the face sticker is hidden."""
+    parts = active_parts(project, clip, frame)
+    a = np.asarray(render_pose(project, pose, yaw, parts=parts))
+    b = np.asarray(render_pose(project, pose, yaw, parts={**parts, "face": None}))
+    return int((a != b).any(axis=2).sum())
 
 
 def load():
@@ -20,30 +34,45 @@ def load():
 
 
 class QioTests(unittest.TestCase):
-    def test_qio_has_expression_parts(self):
+    def test_faces_are_thin_stickers(self):
         raw, _ = load()
-        head = raw["parts"]["head"]
-        for name in ("head_blink", "head_wink"):
-            self.assertIn(name, raw["parts"])
-            self.assertEqual(raw["parts"][name]["size"], head["size"])
-            self.assertEqual(raw["parts"][name]["pivot"], head["pivot"])
-            self.assertNotEqual(raw["parts"][name]["voxels"], head["voxels"])
+        sizes = {tuple(raw["parts"][f"face_{n}"]["size"]) for n in FACES}
+        self.assertEqual(len(sizes), 1)
+        (w, h, d), = sizes
+        self.assertEqual(d, 1)
+        self.assertLessEqual(max(w, h), 17)
+        total = sum(len(raw["parts"][f"face_{n}"]["voxels"]) for n in FACES)
+        self.assertLess(total, len(raw["parts"]["head"]["voxels"]))
+        self.assertNotIn("head_blink", raw["parts"])
+        self.assertNotIn("head_wink", raw["parts"])
+        self.assertEqual(raw["rig"]["bones"]["face"]["parent"], "head")
+        self.assertEqual(raw["rig"]["bones"]["face"]["part"], "face_happy")
+
+    def test_face_sticker_visible_front_and_three_quarter_only(self):
+        _, project = load()
+        clip = project.clips["idle"]
+        pose = evaluate_pose(project, clip, 0)
+        for yaw in (0, 45, 315):
+            self.assertGreater(face_pixels(project, clip, pose, yaw), 20, yaw)
+        self.assertEqual(face_pixels(project, clip, pose, 180), 0)
+
+    def test_export_directions_front_and_three_quarter(self):
+        raw, _ = load()
+        self.assertEqual(raw["export"]["directions"], [0, 45, 315])
 
     def test_idle_blinks(self):
         _, project = load()
         clip = project.clips["idle"]
-        blink = [f for f in range(clip.frames) if active_parts(project, clip, f)["head"] == "head_blink"]
-        self.assertEqual(blink, [5])
-        for f in range(clip.frames):
-            if f not in blink:
-                self.assertEqual(active_parts(project, clip, f)["head"], "head")
+        faces = [active_parts(project, clip, f)["face"] for f in range(clip.frames)]
+        self.assertEqual([f for f, n in enumerate(faces) if n == "face_blink"], [5])
+        self.assertEqual({n for n in faces if n != "face_blink"}, {"face_happy"})
 
     def test_thumbs_up_winks(self):
         _, project = load()
         clip = project.clips["thumbs_up"]
-        used = {f: active_parts(project, clip, f)["head"] for f in range(clip.frames)}
-        self.assertIn("head_wink", used.values())
-        self.assertIn("head", used.values())
+        used = {active_parts(project, clip, f)["face"] for f in range(clip.frames)}
+        self.assertIn("face_wink", used)
+        self.assertIn("face_happy", used)
 
     def test_qio_shell_enabled(self):
         raw, _ = load()

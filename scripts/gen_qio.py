@@ -77,8 +77,8 @@ def ellipsoid(cx, cy, cz, rx, ry, rz):
     return lambda x, y, z: ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 + ((z - cz) / rz) ** 2 <= 1.0
 
 
-def head(expression: str = "open"):
-    """expression: open | blink (both eyes closed arcs) | wink (left eye, +X, closed)."""
+def head():
+    """Blank head: red ring, white face disc (stickers from face() sit in front of it)."""
     W, H, D = 29, 21, 24
     cx, cy, cz, R = 14, 10, 10, 9.6
     g = Grid(W, H, D)
@@ -118,39 +118,104 @@ def head(expression: str = "open"):
 
     g.fill(body)
 
-    def eye(x, y, ex):
-        dx, dy = x - ex, y - (cy + 0.5)
-        if (dx / 1.4) ** 2 + (dy / 2.0) ** 2 <= 1.0:
-            return "w" if (dx < 0 and dy >= 1) else "k"
+    return g.part([cx, 1, cz])
+
+
+FACES = ("happy", "blink", "wink", "excited", "thinking", "surprised", "content", "worried")
+FACE_SIZE = 15  # sticker grid, centred on the face disc
+FACE_OFFSET = [0, 9, 8]  # face bone in head space: disc centre, one voxel in front of the disc
+
+
+def face(name: str):
+    """Thin face sticker. Grid x/y are face-local with (0, 0) at the disc centre; +x = character's left."""
+    if name not in FACES:
+        raise ValueError(name)
+    n = FACE_SIZE
+    half = n // 2
+    g = Grid(n, n, 1)
+    ex = 3  # eye centres at x = +-3
+
+    def open_eye(dx, dy):
+        if (dx / 1.6) ** 2 + ((dy - 0.5) / 2.2) ** 2 <= 1.0:  # 3x4 oval with a glint
+            return "w" if (dx, dy) == (-1, 2) else "k"
         return None
 
-    def closed_eye(x, y, ex):
-        # happy closed eye: a 3-wide "n" arc (ends one row below the crown)
-        d = abs(x - ex)
-        if (y == cy + 1 and d <= 1) or (y == cy and d == 1):
-            return "k"
+    def small_eye(dx, dy):
+        return "k" if abs(dx) <= 0.5 and 0 <= dy <= 1 else None
+
+    def round_eye(dx, dy):
+        if abs(dx) <= 1 and 0 <= dy <= 2:  # 3x3 wide-open stare with a glint
+            return "w" if (dx, dy) == (-1, 2) else "k"
         return None
 
-    closed = {"open": (), "blink": (cx - 3, cx + 3), "wink": (cx + 3,)}[expression]
+    def closed_eye(dx, dy):
+        d = abs(dx)
+        return "k" if (dy == 1 and d <= 1) or (dy == 0 and d == 1) else None
 
-    def face(x, y):
-        dx, dy = x - cx, y - cy
-        if math.sqrt(dx * dx + dy * dy) >= face_r:
+    def star_eye(dx, dy):
+        dy -= 0.5
+        if abs(dx) + abs(dy) <= 1.5 or (abs(dx) <= 0.5 and abs(dy) <= 2.5) or (abs(dy) <= 0.5 and abs(dx) <= 2.0):
+            return "y"
+        return None
+
+    eyes = {
+        "happy": (open_eye, open_eye), "blink": (closed_eye, closed_eye), "wink": (open_eye, closed_eye),
+        "excited": (star_eye, star_eye), "thinking": (small_eye, small_eye), "surprised": (round_eye, round_eye),
+        "content": (closed_eye, closed_eye), "worried": (open_eye, open_eye),
+    }[name]  # (character's right eye at -x, left eye at +x)
+
+    def brows(dx, dy):
+        if name == "thinking":  # left brow raised and slanted, right brow flat
+            return (dx in (2, 3, 4) and dy == 3 + (dx == 3) + (dx == 4)) or (dx in (-4, -3, -2) and dy == 3)
+        if name == "surprised":
+            return abs(dx) in (2, 3, 4) and dy == 4
+        if name == "worried":  # inner ends up
+            return abs(dx) in (2, 3, 4) and dy == 4 + (abs(dx) == 2)
+        return False
+
+    def mouth(dx, dy):
+        if name in ("happy", "blink", "wink"):
+            if abs(dx) <= 1.5 and -4 <= dy <= -2:
+                if dy == -2 or dy == -3 or (dy == -4 and abs(dx) <= 0.5):
+                    return "t" if dy == -4 or (dy == -3 and abs(dx) <= 0.5) else "m"
+        elif name == "excited":  # wide open grin
+            if abs(dx) <= 2 and -5 <= dy <= -2 and not (dy == -5 and abs(dx) == 2):
+                return "t" if dy <= -4 and abs(dx) <= 1 else "m"
+        elif name == "thinking":
+            if dy == -3 and -1 <= dx <= 2:
+                return "m"
+        elif name == "surprised":
+            if abs(dx) <= 1 and -5 <= dy <= -3 and not (abs(dx) == 1 and dy in (-3, -5)):
+                return "m" if (dx, dy) != (0, -4) else "t"
+            if abs(dx) == 1 and dy in (-3, -5):
+                return None
+        elif name == "content":
+            if (abs(dx) == 2 and dy == -2) or (abs(dx) <= 1 and dy == -3):
+                return "m"
+        elif name == "worried":
+            if abs(dx) <= 2 and dy == (-3 if dx % 2 == 0 else -2):
+                return "m"
+        return None
+
+    def paint(x, y, z):
+        dx, dy = x - half, y - half
+        if dx * dx + dy * dy >= 42:  # stay on the disc
             return None
-        for ex in (cx - 3, cx + 3):
-            c = closed_eye(x, y, ex) if ex in closed else eye(x, y, ex)
+        for i, cx_ in enumerate((-ex, ex)):
+            c = eyes[i](dx - cx_, dy)
             if c:
                 return c
-        if 4 <= abs(dx) <= 5.5 and -2.5 <= dy <= -1.5:
+        if brows(dx, dy):
+            return "k"
+        c = mouth(dx, dy)
+        if c:
+            return c
+        if name not in ("thinking", "worried") and 4 <= abs(dx) <= 5.5 and -2.5 <= dy <= -1.5:
             return "p"
-        # open smile
-        if abs(dx) <= 1.5 and -4 <= dy <= -2:
-            if dy == -2 or (dy == -3 and abs(dx) <= 1.5) or (dy == -4 and abs(dx) <= 0.5):
-                return "t" if dy == -4 or (dy == -3 and abs(dx) <= 0.5) else "m"
         return None
 
-    g.front_paint(face, z_min=face_z)
-    return g.part([cx, 1, cz])
+    g.fill(paint)
+    return g.part([half, half, 0])
 
 
 def antenna():
@@ -265,14 +330,16 @@ def part_key(frame, value):
 
 def build():
     parts = {
-        "head": head(), "head_blink": head("blink"), "head_wink": head("wink"), "antenna": antenna(), "torso": torso(), "backpack": backpack(),
+        "head": head(), "antenna": antenna(), "torso": torso(), "backpack": backpack(),
         "sleeve": sleeve(), "hand": hand(), "leg": leg(), "shoe": shoe(), "tablet": tablet(),
     }
+    parts.update({f"face_{n}": face(n) for n in FACES})
     bones = {
         "root": {"translation": [0, 8.5, 0]},
         "torso": {"parent": "root", "part": "torso"},
         "backpack": {"parent": "torso", "translation": [0, 1, -4], "part": "backpack"},
         "head": {"parent": "torso", "translation": [0, 8, 0], "part": "head"},
+        "face": {"parent": "head", "translation": FACE_OFFSET, "part": "face_happy"},
         "antenna": {"parent": "head", "translation": [0, 19, -0.5], "part": "antenna"},
     }
     for side, sx in (("left", 1), ("right", -1)):
@@ -288,8 +355,8 @@ def build():
     animations = {
         "idle": {"frames": 8, "fps": 8, "loop": True, "bones": {
             "root": {"translation": [key(0, zero), key(4, [0, -0.6, 0])]},
-            "head": {"rotation": [key(0, [0, 0, -3]), key(4, [0, 0, 3])],
-                     "part": [part_key(5, "head_blink"), part_key(6, "head")]},
+            "head": {"rotation": [key(0, [0, 0, -3]), key(4, [0, 0, 3])]},
+            "face": {"part": [part_key(5, "face_blink"), part_key(6, "face_happy")]},
             "antenna": {"rotation": [key(0, [0, 0, 10]), key(4, [0, 0, -10])]},
             "left_arm": {"rotation": [key(0, [-55, 0, 0])]},
             "right_arm": {"rotation": [key(0, [0, 0, -4]), key(4, [0, 0, 4])]},
@@ -309,15 +376,15 @@ def build():
             "root": {"translation": [key(0, zero), key(4, [0, 0.5, 0])]},
             "right_arm": {"rotation": [key(0, [-60, 0, -150]), key(4, [-60, 0, -135])]},
             "left_arm": {"rotation": [key(0, [-55, 0, 0])]},
-            "head": {"rotation": [key(0, [0, 0, 6]), key(4, [0, 0, 2])],
-                     "part": [part_key(2, "head_wink"), part_key(6, "head")]},
+            "head": {"rotation": [key(0, [0, 0, 6]), key(4, [0, 0, 2])]},
+            "face": {"part": [part_key(2, "face_wink"), part_key(6, "face_happy")]},
             "antenna": {"rotation": [key(0, [0, 0, -12]), key(4, [0, 0, 12])]},
         }},
     }
     return {
         "palette": PALETTE, "parts": parts, "rig": {"bones": bones}, "animations": animations,
         "export": {"name": "qio", "size": [128, 168], "scale": 3, "origin": [64, 160],
-                   "directions": [0, 45, 90, 135, 180, 225, 270, 315],
+                   "directions": [0, 45, 315],
                    "normals": NORMALS, "shell": SHELL, "trim": True,
                    "background": [0, 0, 0, 0]},
     }
