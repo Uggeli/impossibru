@@ -83,8 +83,8 @@ export function canvasCell(
  * Operates in <0.1ms without intermediate string allocations, maintaining silhouette parity.
  */
 export function fastFloodFill(
-  partSpec: { front: string; back: string; side: string; [key: string]: any },
-  view: 'front' | 'side' | 'back',
+  partSpec: { [key: string]: any },
+  view: 'front' | 'side' | 'back' | 'left' | 'right',
   startX: number,
   startY: number,
   fillChar: string,
@@ -100,8 +100,8 @@ export function fastFloodFill(
   const targetChar = primary[startY][startX];
   if (targetChar === fillChar) return false;
 
-  const isSilhouetteLinked = (view === 'front' || view === 'back');
-  const otherView = view === 'front' ? 'back' : 'front';
+  const otherView = ({ front: 'back', back: 'front', left: 'right', right: 'left' } as Record<string, string>)[view];
+  const isSilhouetteLinked = otherView !== undefined;
   let secondary: string[][] | null = null;
   if (isSilhouetteLinked) {
     secondary = partSpec[otherView].replace(/^\n|\n$/g, '').split('\n').map(r => r.split(''));

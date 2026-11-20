@@ -648,13 +648,14 @@ test.describe('Separate left/right views', () => {
 
   test('painting left changes only left colours; erasing left empties right', async ({ page }) => {
     await page.locator('#separateSides').check();
+    await page.locator('#addColor').click();
+    await respondModal(page, 'z');
+    await expect(page.locator('.swatch-char:has-text("z")')).toBeVisible();
+    await page.locator('#paletteList .swatch', { hasText: 'z' }).click();
     await save(page);
     const name = Object.keys((await stored(page)).parts)[0];
     const before = (await stored(page)).parts[name];
-    // pick a second palette colour if available, then pencil on an occupied cell
     await page.locator('[data-tool="pencil"]').click();
-    const swatches = page.locator('#paletteList .swatch');
-    if ((await swatches.count()) > 1) await swatches.nth(1).click();
     const rowsOf = (s: string) => s.split('\n');
     const cells: Array<[number, number]> = [];
     rowsOf(before.left).forEach((r, y) => [...r].forEach((c, x) => { if (c !== '.') cells.push([x, y]); }));
@@ -662,10 +663,10 @@ test.describe('Separate left/right views', () => {
     await paintCell(page, 'left', cx, cy);
     await save(page);
     const afterPaint = (await stored(page)).parts[name];
+    expect(rowsOf(afterPaint.left)[cy][cx]).toBe('z');
     expect(afterPaint.front).toBe(before.front);
     expect(afterPaint.back).toBe(before.back);
     expect(afterPaint.right).toBe(before.right);
-    if ((await swatches.count()) > 1) expect(afterPaint.left).not.toBe(before.left);
 
     await page.locator('[data-tool="eraser"]').click();
     await paintCell(page, 'left', cx, cy);
@@ -673,6 +674,21 @@ test.describe('Separate left/right views', () => {
     const afterErase = (await stored(page)).parts[name];
     expect(rowsOf(afterErase.left)[cy][cx]).toBe('.');
     expect(rowsOf(afterErase.right)[cy][cx]).toBe('.');
+  });
+
+  test('filling an empty region on left also fills right occupancy', async ({ page }) => {
+    await page.locator('#separateSides').check();
+    await save(page);
+    const name = Object.keys((await stored(page)).parts)[0];
+    const before = (await stored(page)).parts[name];
+    const [cx, cy] = before.left.split('\n').map((r: string, y: number) => [[...r].findIndex(c => c === '.'), y]).find((c: number[]) => c[0] >= 0)!;
+    await page.locator('[data-tool="fill"]').click();
+    await paintCell(page, 'left', cx, cy);
+    await save(page);
+    const after = (await stored(page)).parts[name];
+    const occ = (s: string) => s.split('\n').map(r => [...r].map(c => c !== '.').join(''));
+    expect(occ(after.left)).not.toEqual(occ(before.left));
+    expect(occ(after.right)).toEqual(occ(after.left));
   });
 
   test('toggling off keeps left as side; undo restores left/right', async ({ page }) => {

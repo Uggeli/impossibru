@@ -108,6 +108,16 @@ describe('canvasCell Coordinate Mapping', () => {
 });
 
 describe('fastFloodFill Algorithm', () => {
+  it('erasing in left syncs erasure in right and fills keep right occupancy', () => {
+    const part: any = { front: 'xx', back: 'xx', left: 'xx\nxx', right: 'xx\nxx' };
+    expect(fastFloodFill(part, 'left', 0, 0, '.', 'y')).toBe(true);
+    expect(part.left).toBe('..\n..');
+    expect(part.right).toBe('..\n..');
+    expect(fastFloodFill(part, 'left', 0, 0, 'y', 'y')).toBe(true);
+    expect(part.left).toBe('yy\nyy');
+    expect(part.right).toBe('yy\nyy');
+  });
+
   it('fills connected region and synchronizes front/back silhouettes', () => {
     const part = {
       front: '....\n.xx.\n.xx.\n....',
