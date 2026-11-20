@@ -320,6 +320,54 @@ def tablet():
     return g.part([0, 2, 0])
 
 
+FX = ("fx_question", "fx_exclaim", "fx_stars", "fx_note", "fx_swirl")
+
+
+def glyph(rows, depth=2):
+    """Flat prop drawn as text rows (top row first); pivot at the bottom centre."""
+    h, w = len(rows), max(len(r) for r in rows)
+    g = Grid(w, h, depth)
+    g.fill(lambda x, y, z: (rows[h - 1 - y].ljust(w)[x] if rows[h - 1 - y].ljust(w)[x] not in ". " else None))
+    return g.part([(w - 1) / 2, 0, (depth - 1) / 2])
+
+
+def fx_question():
+    return glyph([".rrr.", "r...r", "....r", "..rr.", "..r..", ".....", "..r.."])
+
+
+def fx_exclaim():
+    return glyph(["r.r", "r.r", "r.r", "r.r", "...", "r.r"])
+
+
+def fx_stars():
+    star = ["..y..", "..y..", "yyyyy", "..y..", "..y.."]
+    small = [".....", ".....", "..y..", ".yyy.", "..y.."]
+    gap = "." * 23
+    return glyph([a + gap + b for a, b in zip(star, small)])
+
+
+def fx_note():
+    return glyph(["..rrr", "..r.r", "..r..", "..r..", "rrr..", "rrr.."])
+
+
+def fx_swirl():
+    """White whirlwind under the feet: three broken rings narrowing downward."""
+    W, H, D = 13, 4, 13
+    g = Grid(W, H, D)
+    c = (W - 1) / 2
+
+    def body(x, y, z):
+        r = math.hypot(x - c, z - c)
+        target = (2.0, 3.6, 5.2, 6.0)[y]
+        a = math.degrees(math.atan2(z - c, x - c)) + y * 70
+        if abs(r - target) <= 0.6 and (a % 360) < 250:
+            return "w"
+        return None
+
+    g.fill(body)
+    return g.part([c, H - 1, c])
+
+
 def key(frame, value, interp="smooth"):
     return {"frame": frame, "value": value, "interpolation": interp}
 
@@ -334,12 +382,20 @@ def build():
         "sleeve": sleeve(), "hand": hand(), "leg": leg(), "shoe": shoe(), "tablet": tablet(),
     }
     parts.update({f"face_{n}": face(n) for n in FACES})
+    parts.update({"fx_question": fx_question(), "fx_exclaim": fx_exclaim(), "fx_stars": fx_stars(),
+                  "fx_note": fx_note(), "fx_swirl": fx_swirl()})
     bones = {
         "root": {"translation": [0, 8.5, 0]},
         "torso": {"parent": "root", "part": "torso"},
         "backpack": {"parent": "torso", "translation": [0, 1, -4], "part": "backpack"},
         "head": {"parent": "torso", "translation": [0, 8, 0], "part": "head"},
         "face": {"parent": "head", "translation": FACE_OFFSET, "part": "face_happy"},
+        # effect props: hidden (part None) until a clip's part keys show them
+        "fx_question": {"parent": "head", "translation": [12, 18, 2], "part": None},
+        "fx_exclaim": {"parent": "head", "translation": [12, 18, 2], "part": None},
+        "fx_stars": {"parent": "head", "translation": [0, 14, 4], "part": None},
+        "fx_note": {"parent": "head", "translation": [12, 17, 2], "part": None},
+        "fx_swirl": {"parent": "root", "translation": [0, -9, 0], "part": None},
         "antenna": {"parent": "head", "translation": [0, 19, -0.5], "part": "antenna"},
     }
     for side, sx in (("left", 1), ("right", -1)):

@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 QIO = ROOT / "examples" / "qio.yaml"
 
 
+FX = ("fx_question", "fx_exclaim", "fx_stars", "fx_note", "fx_swirl")
 FACES = ("happy", "blink", "wink", "excited", "thinking", "surprised", "content", "worried")
 
 
@@ -73,6 +74,20 @@ class QioTests(unittest.TestCase):
         used = {active_parts(project, clip, f)["face"] for f in range(clip.frames)}
         self.assertIn("face_wink", used)
         self.assertIn("face_happy", used)
+
+    def test_props_hidden_by_default(self):
+        raw, project = load()
+        for n in FX:
+            self.assertIn(n, raw["rig"]["bones"])
+            self.assertIsNone(raw["rig"]["bones"][n]["part"])
+            self.assertIn(n, raw["parts"])
+            for c in ("idle", "walk"):
+                clip = project.clips[c]
+                for f in range(clip.frames):
+                    self.assertIsNone(active_parts(project, clip, f)[n], (n, c, f))
+        self.assertEqual(raw["rig"]["bones"]["fx_swirl"]["parent"], "root")
+        for n in FX[:4]:
+            self.assertEqual(raw["rig"]["bones"][n]["parent"], "head")
 
     def test_qio_shell_enabled(self):
         raw, _ = load()
