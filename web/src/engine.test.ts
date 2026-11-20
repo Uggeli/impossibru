@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { activeParts, metadata, pose, render, validateProject } from './engine';
+import { activeParts, metadata, pose, render, validateProject, voxels } from './engine';
 import { starterProject } from './runtime';
 import type { ProjectDocument } from './types';
 import yaml from 'js-yaml';
@@ -599,5 +599,64 @@ describe('Part swap tracks', () => {
       'animations.idle.bones.root.part[0].interpolation is not allowed on part keys'
     );
     expect(() => validateProject(swapDoc([]))).toThrow(/non-empty keyframe list/);
+  });
+});
+
+
+describe('Separate left/right side views', () => {
+  const CUBE = 'aaa\naaa\naaa';
+  const mk = (views: Record<string, string>): ProjectDocument => {
+    const d = starterProject();
+    d.palette = { a: [255, 0, 0, 255], b: [0, 0, 255, 255] } as any;
+    d.parts = { p: { front: CUBE, back: CUBE, ...views } } as any;
+    d.rig.bones = { root: { part: 'p' } } as any;
+    return d;
+  };
+
+  it('colours +X from left and -X from right', () => {
+    const d = mk({ left: CUBE, right: 'bbb\nbbb\nbbb' });
+    validateProject(d);
+    const vs = voxels(d, 'p');
+    const at = (x: number, y: number, z: number) =>
+      vs.find((v: any) => v.p[0] === x && v.p[1] === y && v.p[2] === z).c;
+    expect(at(1, 1, 0)).toEqual([255, 0, 0, 255]);
+    expect(at(-1, 1, 0)).toEqual([0, 0, 255, 255]);
+  });
+
+  it('left=right=side renders the same voxels as side', () => {
+    const a = mk({ side: 'aab\nabb\naaa' });
+    const b = mk({ left: 'aab\nabb\naaa', right: 'aab\nabb\naaa' });
+    expect(voxels(b, 'p')).toEqual(voxels(a, 'p'));
+  });
+
+  it('rejects side with left/right', () => {
+    expect(() =>
+      validateProject(mk({ side: CUBE, left: CUBE, right: CUBE }))
+    ).toThrow('parts.p: use either side or left/right, not both');
+  });
+
+  it('rejects only one of left/right', () => {
+    for (const k of ['left', 'right'])
+      expect(() => validateProject(mk({ [k]: CUBE }))).toThrow(
+        'parts.p: left and right must both be given'
+      );
+  });
+
+  it('rejects mismatched left/right outlines', () => {
+    expect(() =>
+      validateProject(mk({ left: CUBE, right: 'aaa\naa.\naaa' }))
+    ).toThrow('parts.p: left/right silhouettes differ at row 2, column 3');
+    expect(() =>
+      validateProject(mk({ left: CUBE, right: 'aaaa\naaaa\naaaa' }))
+    ).toThrow('left/right silhouettes differ at row 1, column 4');
+  });
+
+  it('rejects unequal heights and unknown chars', () => {
+    expect(() =>
+      validateProject(mk({ left: CUBE, right: 'aaa\naaa' }))
+    ).toThrow('parts.p: front, back, and side views must have equal heights');
+    expect(() =>
+      validateProject(mk({ left: CUBE, right: 'aaa\naza\naaa' }))
+    ).toThrow("parts.p.right uses unknown palette character 'z'");
   });
 });

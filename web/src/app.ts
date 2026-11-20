@@ -98,6 +98,12 @@ function setRows(view: string, value: string[]) {
   }
   state.doc.parts[state.part][view] = value.join('\n');
 }
+function isSplit(): boolean {
+  return 'left' in selectedSpec();
+}
+function sideView(): string {
+  return isSplit() ? 'left' : 'side';
+}
 function selectedSpec(): PartSpec {
   return state.doc.parts[state.part];
 }
@@ -412,7 +418,7 @@ function renderDimensions() {
     $('partDepth').value = d;
     return;
   }
-  const front = rows('front'), side = rows('side');
+  const front = rows('front'), side = rows(sideView());
   $('partWidth').value = front[0].length;
   $('partHeight').value = front.length;
   $('partDepth').value = side[0].length;
@@ -420,8 +426,13 @@ function renderDimensions() {
 
 function renderCanvases() {
   const grid = isGridSelected();
-  document.querySelectorAll<HTMLElement>('.views article[data-kind]').forEach(a => a.hidden = (a.dataset.kind === 'grid') !== grid);
+  const split = !grid && isSplit();
+  document.querySelectorAll<HTMLElement>('.views article[data-kind]').forEach(a => {
+    a.hidden = (a.dataset.kind === 'grid') !== grid || (a.dataset.sides === 'single' && split) || (a.dataset.sides === 'split' && !split);
+  });
   $('syncSilhouette').hidden = grid;
+  $('separateSidesLabel').hidden = grid;
+  $('separateSides').checked = split;
   if (grid) {
     clampSlice();
     const h = (selectedSpec() as any).size[1];
@@ -432,7 +443,7 @@ function renderCanvases() {
     drawCanvas('slice');
     return;
   }
-  ['front', 'side', 'back'].forEach(drawCanvas);
+  (split ? ['front', 'left', 'right', 'back'] : ['front', 'side', 'back']).forEach(drawCanvas);
 }
 
 function goToSlice(y: number) {
@@ -735,8 +746,8 @@ function writeCell(view: string, x: number, y: number, char: string) {
   grid[y] = line.join('');
   setRows(view, grid);
 
-  if (view === 'front' || view === 'back') {
-    const other = view === 'front' ? 'back' : 'front', og = rows(other), ol = [...og[y]];
+  if (view === 'front' || view === 'back' || view === 'left' || view === 'right') {
+    const other = { front: 'back', back: 'front', left: 'right', right: 'left' }[view]!, og = rows(other), ol = [...og[y]];
     if (char === '.') ol[x] = '.';
     else if (ol[x] === '.') ol[x] = state.color;
     og[y] = ol.join('');
@@ -1077,14 +1088,15 @@ async function resizePart() {
     changed();
     return;
   }
-  const f = rows('front'), s = rows('side'), ow = f[0].length, oh = f.length, od = s[0].length;
+  const f = rows('front'), s = rows(sideView()), ow = f[0].length, oh = f.length, od = s[0].length;
   if (nw === ow && nh === oh && nd === od) return;
 
   checkpoint();
   const ox = Math.floor((nw - ow) / 2), oz = Math.floor((nd - od) / 2), oy = nh - oh;
   setRows('front', resizeGrid(f, nw, nh, ox, oy));
   setRows('back', resizeGrid(rows('back'), nw, nh, ox, oy));
-  setRows('side', resizeGrid(s, nd, nh, oz, oy));
+  setRows(sideView(), resizeGrid(s, nd, nh, oz, oy));
+  if (isSplit()) setRows('right', resizeGrid(rows('right'), nd, nh, oz, oy));
   const p = selectedSpec().pivot || [(ow - 1) / 2, 0, (od - 1) / 2];
   selectedSpec().pivot = [+p[0] + ox, +p[1], +p[2] + oz];
   changed();
@@ -3108,7 +3120,7 @@ $('sliceIndex').oninput = () => goToSlice(+$('sliceIndex').value);
 $('sliceGhost').onchange = () => renderCanvases();
 
 // Canvas Binding
-['front', 'side', 'back', 'slice'].forEach(bindCanvas);
+['front', 'side', 'left', 'right', 'back', 'slice'].forEach(bindCanvas);
 
 // Mirror & Sync Silhouette Buttons
 $('mirrorToggle').onclick = () => {
@@ -3118,6 +3130,35 @@ $('mirrorToggle').onclick = () => {
 };
 
 $('syncSilhouette').onclick = () => syncSilhouette();
+$('separateSides').onchange = async () => {
+  const spec = selectedSpec() as any;
+  if (isGridSelected()) return;
+  const turnOn = $('separateSides').checked;
+  if (turnOn === ('left' in spec)) return;
+  if (!turnOn) {
+    const ok = await modalConfirm({
+      title: 'Merge Side Views',
+      message: 'Keep the left view as the single side view? Right-side paint will be lost.',
+      confirmText: 'Keep left'
+    });
+    if (!ok) { $('separateSides').checked = true; return; }
+  }
+  checkpoint();
+  if (turnOn) {
+    spec.left = spec.side;
+    spec.right = spec.side;
+    delete spec.side;
+    if (focusedView === 'side') focusedView = 'left';
+  } else {
+    spec.side = spec.left;
+    delete spec.left;
+    delete spec.right;
+    if (focusedView === 'left' || focusedView === 'right') focusedView = 'side';
+  }
+  changed();
+  arrangeViews();
+  validateAndPreview();
+};
 
 // Action Buttons
 $('addPart').onclick = addPart;

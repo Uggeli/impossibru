@@ -517,16 +517,36 @@ export function validateProject(d: ProjectDocument): ProjectDocument {
       if (p.pivot !== undefined) vec(p.pivot, `parts.${n}.pivot`, 3);
       continue;
     }
+    const hasLR = 'left' in p || 'right' in p;
+    if ('side' in p && hasLR) {
+      throw new ProjectError(
+        `parts.${n}: use either side or left/right, not both`
+      );
+    }
+    if (hasLR && !('left' in p && 'right' in p)) {
+      throw new ProjectError(`parts.${n}: left and right must both be given`);
+    }
     const f = rows(p.front, `parts.${n}.front`),
       b = rows(p.back, `parts.${n}.back`),
-      s = rows(p.side, `parts.${n}.side`);
-    for (const [vn, g] of [
-      ['front', f],
-      ['back', b],
-      ['side', s],
-    ] as const) {
-      g.forEach((r, y) =>
-        [...r].forEach((ch, x) => {
+      s = hasLR
+        ? rows((p as any).left, `parts.${n}.left`)
+        : rows(p.side, `parts.${n}.side`),
+      r = hasLR ? rows((p as any).right, `parts.${n}.right`) : s;
+    const views: [string, string[]][] = hasLR
+      ? [
+          ['front', f],
+          ['back', b],
+          ['left', s],
+          ['right', r],
+        ]
+      : [
+          ['front', f],
+          ['back', b],
+          ['side', s],
+        ];
+    for (const [vn, g] of views) {
+      g.forEach((row, y) =>
+        [...row].forEach((ch, x) => {
           if (ch !== '.' && !d.palette[ch]) {
             throw new ProjectError(
               `parts.${n}.${vn} uses unknown palette character '${ch}' at row ${y + 1}, column ${x + 1}`
@@ -540,13 +560,13 @@ export function validateProject(d: ProjectDocument): ProjectDocument {
         `parts.${n}: front and back views must have equal dimensions`
       );
     }
-    if (f.length !== s.length) {
+    if (f.length !== s.length || (hasLR && r.length !== s.length)) {
       throw new ProjectError(
         `parts.${n}: front, back, and side views must have equal heights`
       );
     }
-    f.forEach((r, y) =>
-      [...r].forEach((ch, x) => {
+    f.forEach((row, y) =>
+      [...row].forEach((ch, x) => {
         if ((ch === '.') !== (b[y][x] === '.')) {
           throw new ProjectError(
             `parts.${n}: front/back silhouettes differ at row ${y + 1}, column ${x + 1}`
@@ -554,6 +574,19 @@ export function validateProject(d: ProjectDocument): ProjectDocument {
         }
       })
     );
+    if (hasLR) {
+      for (let y = 0; y < s.length; y++) {
+        for (let z = 0; z < Math.max(s[0].length, r[0].length); z++) {
+          const l = z < s[0].length ? s[y][z] : '.',
+            rr = z < r[0].length ? r[y][z] : '.';
+          if ((l === '.') !== (rr === '.')) {
+            throw new ProjectError(
+              `parts.${n}: left/right silhouettes differ at row ${y + 1}, column ${z + 1}`
+            );
+          }
+        }
+      }
+    }
 
     // Voxel count validation
     const h = f.length,
@@ -1129,7 +1162,7 @@ export function pose(
   return world;
 }
 
-function voxels(d: ProjectDocument, p: string) {
+export function voxels(d: ProjectDocument, p: string) {
   const part = d.parts[p];
   if (isGridPart(part)) {
     const g = decodeGrid(part, p, d.palette),
@@ -1160,7 +1193,8 @@ function voxels(d: ProjectDocument, p: string) {
   const q = part,
     f = rows(q.front, ''),
     b = rows(q.back, ''),
-    s = rows(q.side, ''),
+    s = 'left' in q ? rows((q as any).left, '') : rows(q.side, ''),
+    r = 'right' in q ? rows((q as any).right, '') : s,
     h = f.length,
     w = f[0].length,
     zs = s[0].length,
@@ -1179,7 +1213,9 @@ function voxels(d: ProjectDocument, p: string) {
                   ? rz >= 0
                     ? f[y][x]
                     : b[y][x]
-                  : s[y][z];
+                  : rx >= 0
+                  ? s[y][z]
+                  : r[y][z];
             const colorKey =
               ch !== '.' && d.palette[ch]
                 ? ch

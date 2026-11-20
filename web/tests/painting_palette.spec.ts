@@ -611,3 +611,92 @@ test.describe('Painting & Palette Workspace (Tiers 1-4)', () => {
     await expect(page.locator('#errorBanner')).toHaveClass(/hidden/);
   });
 });
+
+test.describe('Separate left/right views', () => {
+  const stored = (page: Page) => page.evaluate(() => JSON.parse(sessionStorage.getItem('impossibru-project')!));
+  const save = async (page: Page) => {
+    await page.waitForTimeout(300);
+    await page.locator('#saveButton').click();
+    await expect(page.locator('#status')).toHaveText('Saved');
+  };
+  const paintCell = async (page: Page, view: string, cx: number, cy: number) => {
+    const canvas = page.locator(`#${view}Canvas`);
+    const cell = +(await canvas.getAttribute('data-cell')!);
+    await canvas.click({ position: { x: (cx + 0.5) * cell, y: (cy + 0.5) * cell } });
+    await page.waitForTimeout(200);
+  };
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    const welcomeNew = page.locator('#welcomeNew');
+    if (await welcomeNew.isVisible()) {
+      await welcomeNew.click();
+      await page.waitForLoadState('networkidle');
+    }
+    await expect(page.locator('#separateSides')).toBeVisible();
+  });
+
+  test('toggle shows four views and copies side to left and right', async ({ page }) => {
+    await expect(page.locator('#leftCanvas')).toBeHidden();
+    await page.locator('#separateSides').check();
+    for (const v of ['front', 'left', 'right', 'back']) await expect(page.locator(`#${v}Canvas`)).toBeVisible();
+    await expect(page.locator('#sideCanvas')).toBeHidden();
+    await save(page);
+    const part = Object.values((await stored(page)).parts)[0] as any;
+    expect(part.side).toBeUndefined();
+    expect(part.left).toBe(part.right);
+  });
+
+  test('painting left changes only left colours; erasing left empties right', async ({ page }) => {
+    await page.locator('#separateSides').check();
+    await save(page);
+    const name = Object.keys((await stored(page)).parts)[0];
+    const before = (await stored(page)).parts[name];
+    // pick a second palette colour if available, then pencil on an occupied cell
+    await page.locator('[data-tool="pencil"]').click();
+    const swatches = page.locator('#paletteList .swatch');
+    if ((await swatches.count()) > 1) await swatches.nth(1).click();
+    const rowsOf = (s: string) => s.split('\n');
+    const cells: Array<[number, number]> = [];
+    rowsOf(before.left).forEach((r, y) => [...r].forEach((c, x) => { if (c !== '.') cells.push([x, y]); }));
+    const [cx, cy] = cells[0];
+    await paintCell(page, 'left', cx, cy);
+    await save(page);
+    const afterPaint = (await stored(page)).parts[name];
+    expect(afterPaint.front).toBe(before.front);
+    expect(afterPaint.back).toBe(before.back);
+    expect(afterPaint.right).toBe(before.right);
+    if ((await swatches.count()) > 1) expect(afterPaint.left).not.toBe(before.left);
+
+    await page.locator('[data-tool="eraser"]').click();
+    await paintCell(page, 'left', cx, cy);
+    await save(page);
+    const afterErase = (await stored(page)).parts[name];
+    expect(rowsOf(afterErase.left)[cy][cx]).toBe('.');
+    expect(rowsOf(afterErase.right)[cy][cx]).toBe('.');
+  });
+
+  test('toggling off keeps left as side; undo restores left/right', async ({ page }) => {
+    await page.locator('#separateSides').check();
+    await page.locator('[data-tool="eraser"]').click();
+    await save(page);
+    const name = Object.keys((await stored(page)).parts)[0];
+    const split = (await stored(page)).parts[name];
+    const cell = split.left.split('\n').map((r: string, y: number) => [[...r].findIndex(c => c !== '.'), y]).find((c: number[]) => c[0] >= 0)!;
+    await paintCell(page, 'left', cell[0], cell[1]);
+    await page.locator('#separateSides').uncheck();
+    await respondModal(page, true);
+    await save(page);
+    const merged = (await stored(page)).parts[name];
+    expect(merged.left).toBeUndefined();
+    expect(merged.right).toBeUndefined();
+    expect(merged.side.split('\n')[cell[1]][cell[0]]).toBe('.');
+
+    await page.locator('#undoButton').click();
+    await expect(page.locator('#leftCanvas')).toBeVisible();
+    await save(page);
+    const restored = (await stored(page)).parts[name];
+    expect(restored.side).toBeUndefined();
+    expect(restored.left.split('\n')[cell[1]][cell[0]]).toBe('.');
+    expect(restored.right.split('\n')[cell[1]][cell[0]]).toBe('.');
+  });
+});
