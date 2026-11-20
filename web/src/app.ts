@@ -1237,7 +1237,7 @@ async function updatePreview() {
     direction: +$('yaw').value,
     clip: $('clip').value,
     frame: +$('frame').value,
-    // Slice highlight is drawn by the browser (TS) renderer only; the Python server ignores it.
+    // Both renderers (browser TS and the Python edit server) tint this slice of a grid part.
     ...(state.mode === 'part' && isGridSelected() ? { slice: state.slice } : {})
   };
   try {

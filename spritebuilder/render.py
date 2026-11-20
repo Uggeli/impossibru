@@ -86,8 +86,16 @@ def render_pose(project: Project, pose: Dict[str, np.ndarray], direction: float,
     return Image.fromarray(image, "RGBA")
 
 
-def render_part(project: Project, part_name: str, direction: float, size: int = 320) -> Image.Image:
-    """Render one part centered and automatically scaled for editor previews."""
+SLICE_HIGHLIGHT = (102, 217, 163, 140)
+
+
+def render_part(project: Project, part_name: str, direction: float, size: int = 320,
+                highlight_y: Optional[float] = None) -> Image.Image:
+    """Render one part centered and automatically scaled for editor previews.
+
+    ``highlight_y`` (part-local Y) tints that one-voxel-tall layer on top of the render, matching the
+    browser editor's slice highlight.
+    """
     if part_name not in project.parts:
         raise ValueError(f"unknown part {part_name!r}")
     part = project.parts[part_name]
@@ -113,4 +121,12 @@ def render_part(project: Project, part_name: str, direction: float, size: int = 
     image = np.zeros((size, size, 4), dtype=np.uint8)
     image[py[mask][order], px[mask][order], :3] = out_rgb[mask][order]
     image[py[mask][order], px[mask][order], 3] = out_alpha[mask][order]
-    return Image.fromarray(image, "RGBA")
+    result = Image.fromarray(image, "RGBA")
+    if highlight_y is not None:
+        layer = np.abs(part.positions[:, 1] - highlight_y) < .5
+        if layer.any():
+            lit = np.repeat(layer, footprint) & mask
+            overlay = np.zeros((size, size, 4), dtype=np.uint8)
+            overlay[py[lit], px[lit]] = SLICE_HIGHLIGHT
+            result = Image.alpha_composite(result, Image.fromarray(overlay, "RGBA"))
+    return result

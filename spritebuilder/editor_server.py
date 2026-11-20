@@ -10,7 +10,7 @@ from pathlib import Path
 import secrets
 import tempfile
 import threading
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from urllib.parse import urlparse
 import webbrowser
 
@@ -45,6 +45,18 @@ class EditorSession:
             "directions": project.export.directions,
             "export_animations": project.export.animations,
         }
+
+
+def _slice_highlight_y(document: Any, part_name: str, slice_index: Any) -> Optional[float]:
+    """Part-local Y of a voxel-grid part's slice (slices count up from the grid's bottom row)."""
+    if isinstance(slice_index, bool) or not isinstance(slice_index, int):
+        return None
+    spec = (document.get("parts") or {}).get(part_name) if isinstance(document, dict) else None
+    if not isinstance(spec, dict) or "voxels" not in spec:
+        return None
+    pivot = spec.get("pivot")
+    pivot_y = float(pivot[1]) if isinstance(pivot, list) and len(pivot) == 3 else 0.0
+    return slice_index - pivot_y
 
 
 def _handler(session: EditorSession):
@@ -160,7 +172,9 @@ def _handler(session: EditorSession):
                 elif route == "/api/preview" and method == "POST":
                     direction = float(payload.get("direction", 0))
                     if payload.get("mode") == "part":
-                        image = render_part(project, str(payload.get("part", "")), direction)
+                        part_name = str(payload.get("part", ""))
+                        image = render_part(project, part_name, direction,
+                                            highlight_y=_slice_highlight_y(data, part_name, payload.get("slice")))
                     else:
                         clip_name = str(payload.get("clip", next(iter(project.clips))))
                         if clip_name not in project.clips:

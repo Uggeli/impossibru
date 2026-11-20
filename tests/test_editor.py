@@ -280,3 +280,43 @@ class EditorAPITests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class EditorSliceHighlightTests(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.path = Path(self.directory.name) / "qio.yaml"
+        shutil.copy(Path(__file__).resolve().parents[1] / "examples" / "qio.yaml", self.path)
+        try:
+            self.server, self.session = create_server(self.path)
+        except PermissionError as exc:
+            self.directory.cleanup()
+            self.skipTest(f"local sockets unavailable: {exc}")
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.thread.start()
+
+    def tearDown(self):
+        if hasattr(self, "server"):
+            self.server.shutdown()
+            self.server.server_close()
+            self.thread.join(2)
+        self.directory.cleanup()
+
+    def preview(self, document, **extra):
+        connection = http.client.HTTPConnection("127.0.0.1", self.server.server_port, timeout=10)
+        body = json.dumps({"document": document, "mode": "part", "part": "head", "direction": 0, **extra})
+        connection.request("POST", "/api/preview", body=body, headers={
+            "Content-Type": "application/json", "X-SpriteBuilder-Token": self.session.token})
+        response = connection.getresponse()
+        content = response.read()
+        connection.close()
+        self.assertEqual(response.status, 200)
+        return content
+
+    def test_grid_part_preview_highlights_requested_slice(self):
+        document = yaml.safe_load(self.path.read_text())
+        plain = self.preview(document)
+        lit = self.preview(document, slice=10)
+        self.assertNotEqual(plain, lit)
+        self.assertEqual(self.preview(document, slice=10), lit)
+        self.assertNotEqual(self.preview(document, slice=3), lit)
