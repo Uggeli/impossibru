@@ -3,7 +3,7 @@ import { activeParts, metadata, pose, render, validateProject, voxels } from './
 import { starterProject } from './runtime';
 import type { ProjectDocument } from './types';
 import yaml from 'js-yaml';
-import qio from '../../examples/qio.yaml?raw';
+import buddy from '../../examples/voxel_buddy.yaml?raw';
 
 
 describe('Browser Project Contract & Backwards Compatibility', () => {
@@ -496,14 +496,14 @@ describe('Runtime Rest-Mode Joint Drag & Autorig Integration', () => {
 });
 
 
-describe('Voxel-grid parts (qio example)', () => {
-  it('validates the qio example', () => {
-    expect(() => validateProject(yaml.load(qio) as ProjectDocument)).not.toThrow();
+describe('Voxel-grid parts (voxel_buddy example)', () => {
+  it('validates the voxel_buddy example', () => {
+    expect(() => validateProject(yaml.load(buddy) as ProjectDocument)).not.toThrow();
   });
 
-  it('renders qio with non-transparent pixels', () => {
+  it('renders voxel_buddy with non-transparent pixels', () => {
     setupTestEnvironment();
-    const doc = validateProject(yaml.load(qio) as ProjectDocument);
+    const doc = validateProject(yaml.load(buddy) as ProjectDocument);
     // The test canvas is a mock without pixel data: record the filled squares instead.
     let opaque = 0;
     const ctx: any = {

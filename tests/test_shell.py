@@ -60,8 +60,8 @@ def assert_shell_parity(testcase, raw, max_color_ratio=0.02, full_clip_frames=No
 
 
 class ShellTests(unittest.TestCase):
-    def test_shell_matches_full_render_on_qio(self):
-        raw = yaml.safe_load((ROOT / "examples" / "qio.yaml").read_text(encoding="utf-8"))
+    def test_shell_matches_full_render_on_voxel_buddy(self):
+        raw = yaml.safe_load((ROOT / "examples" / "voxel_buddy.yaml").read_text(encoding="utf-8"))
         assert_shell_parity(self, raw)
 
     def test_shell_matches_on_mundus_orc(self):

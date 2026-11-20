@@ -1,0 +1,265 @@
+palette:
+  b: '#2F7DD1'
+  B: '#1D4F8A'
+  w: '#F4F6FA'
+  k: '#1E2230'
+  p: '#F59AB0'
+  y: '#FFC93C'
+parts:
+  head:
+    size:
+    - 17
+    - 15
+    - 15
+    voxels: 55.9B7.11B6.11B6.11B6.11B6.11B6.11B6.11B7.9B75.11b5.13b3.15b2.15b2.15b2.15b2.15b2.15b2.15b2.15b2.15b3.13b5.11b39.13b3.15b2.15b2.15b2.15b2.15b2.15b2.15b2.15b2.15b2.15b2.15b3.13b23.9b5.15b2.15b.153b.15b2.15b5.9w7.11b4.15b2.15b.153b.15b2.15b4.11w6.11b4.15b2.15b.153b.15b2.15b4.11w6.11b4.15b2.15b.153b.15b2.15b4.11w6.11b4.15b2.15b.153b.15b2.15b4.11w6.11b4.15b2.15b.153b.15b2.15b4.11w6.11b4.15b2.15b.153b.15b2.15b4.11w6.11b4.15b2.15b.153b.15b2.15b4.11w7.9b5.15b2.15b.153b.15b2.15b5.9w23.13b3.15b2.15b2.15b2.15b2.15b2.15b2.15b2.15b2.15b2.15b2.15b3.13b39.11b5.13b3.15b2.15b2.15b2.15b2.15b2.15b2.15b2.15b2.15b3.13b5.11b75.9b7.11b6.11b6.11b6.11b6.11b6.11b6.11b7.9b55.
+    pivot:
+    - 8.0
+    - 0
+    - 7.0
+  torso:
+    size:
+    - 11
+    - 9
+    - 7
+    voxels: 77B616b
+    pivot:
+    - 5.0
+    - 8
+    - 3.0
+  arm:
+    size:
+    - 3
+    - 7
+    - 3
+    voxels: 63B
+    pivot:
+    - 1.0
+    - 6
+    - 1.0
+  hand:
+    size:
+    - 3
+    - 3
+    - 3
+    voxels: 27k
+    pivot:
+    - 1.0
+    - 2
+    - 1.0
+  leg:
+    size:
+    - 3
+    - 6
+    - 3
+    voxels: 54B
+    pivot:
+    - 1.0
+    - 5
+    - 1.0
+  fx_spark:
+    size:
+    - 5
+    - 5
+    - 1
+    voxels: 2.y4.y2.5y2.y4.y2.
+    pivot:
+    - 2
+    - 0
+    - 0
+  face_open:
+    size:
+    - 11
+    - 9
+    - 1
+    voxels: 26.3k5.p.k3.k.p2.3k3.3k2.3k3.3k2.w2k3.w2k23.
+    pivot:
+    - 5
+    - 4
+    - 0
+  face_blink:
+    size:
+    - 11
+    - 9
+    - 1
+    voxels: 26.3k5.p.k3.k.p13.3k3.3k34.
+    pivot:
+    - 5
+    - 4
+    - 0
+rig:
+  bones:
+    root:
+      translation:
+      - 0
+      - 6
+      - 0
+    torso:
+      parent: root
+      part: torso
+      translation:
+      - 0
+      - 9
+      - 0
+    head:
+      parent: torso
+      translation:
+      - 0
+      - 1
+      - 0
+      part: head
+    face:
+      parent: head
+      translation:
+      - 0
+      - 7
+      - 7.5
+      part: face_open
+    fx_spark:
+      parent: head
+      translation:
+      - 8
+      - 15
+      - 0
+      part: null
+    left_arm:
+      parent: torso
+      translation:
+      - 7
+      - 0
+      - 0
+      part: arm
+    left_hand:
+      parent: left_arm
+      translation:
+      - 0
+      - -7
+      - 0
+      part: hand
+    left_leg:
+      parent: root
+      translation:
+      - 3
+      - 0
+      - 0
+      part: leg
+    right_arm:
+      parent: torso
+      translation:
+      - -7
+      - 0
+      - 0
+      part: arm
+    right_hand:
+      parent: right_arm
+      translation:
+      - 0
+      - -7
+      - 0
+      part: hand
+    right_leg:
+      parent: root
+      translation:
+      - -3
+      - 0
+      - 0
+      part: leg
+animations:
+  idle:
+    frames: 8
+    fps: 8
+    loop: true
+    bones:
+      root:
+        translation:
+        - frame: 0
+          value: &id001
+          - 0
+          - 0
+          - 0
+          interpolation: smooth
+        - frame: 4
+          value:
+          - 0
+          - -0.5
+          - 0
+          interpolation: smooth
+      head:
+        rotation:
+        - frame: 0
+          value:
+          - 0
+          - 0
+          - -3
+          interpolation: smooth
+        - frame: 4
+          value:
+          - 0
+          - 0
+          - 3
+          interpolation: smooth
+      face:
+        part:
+        - frame: 5
+          value: face_blink
+        - frame: 6
+          value: face_open
+  wave:
+    frames: 8
+    fps: 8
+    loop: false
+    bones:
+      right_arm:
+        rotation:
+        - frame: 0
+          value: *id001
+          interpolation: smooth
+        - frame: 2
+          value:
+          - 0
+          - 0
+          - -150
+          interpolation: smooth
+        - frame: 4
+          value:
+          - 0
+          - 0
+          - -120
+          interpolation: smooth
+        - frame: 6
+          value:
+          - 0
+          - 0
+          - -150
+          interpolation: smooth
+        - frame: 7
+          value: *id001
+          interpolation: smooth
+      fx_spark:
+        part:
+        - frame: 0
+          value: null
+        - frame: 2
+          value: fx_spark
+        - frame: 7
+          value: null
+export:
+  name: voxel_buddy
+  size:
+  - 104
+  - 136
+  scale: 3
+  origin:
+  - 52
+  - 128
+  directions:
+  - 0
+  - 45
+  - 315
+  normals: surface
+  shell: true
+  trim: true
+  background:
+  - 0
+  - 0
+  - 0
+  - 0

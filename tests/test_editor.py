@@ -285,8 +285,8 @@ if __name__ == "__main__":
 class EditorSliceHighlightTests(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
-        self.path = Path(self.directory.name) / "qio.yaml"
-        shutil.copy(Path(__file__).resolve().parents[1] / "examples" / "qio.yaml", self.path)
+        self.path = Path(self.directory.name) / "voxel_buddy.yaml"
+        shutil.copy(Path(__file__).resolve().parents[1] / "examples" / "voxel_buddy.yaml", self.path)
         try:
             self.server, self.session = create_server(self.path)
         except PermissionError as exc:

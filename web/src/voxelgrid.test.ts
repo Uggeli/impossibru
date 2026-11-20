@@ -1,12 +1,12 @@
 import { describe, expect, test } from 'vitest';
 import yaml from 'js-yaml';
-import qio from '../../examples/qio.yaml?raw';
+import buddy from '../../examples/voxel_buddy.yaml?raw';
 import { decodeGrid, encodeGrid, getSlice, setSlice, resizeGrid3, isGridPart, replaceChar, usesChar } from './voxelgrid';
 import type { GridPartSpec, ProjectDocument } from './types';
 
 describe('voxelgrid', () => {
-  test('round-trips every qio part', () => {
-    const doc = yaml.load(qio) as ProjectDocument;
+  test('round-trips every voxel_buddy part', () => {
+    const doc = yaml.load(buddy) as ProjectDocument;
     const parts = Object.entries(doc.parts);
     expect(parts.length).toBeGreaterThan(0);
     for (const [name, p] of parts) {
