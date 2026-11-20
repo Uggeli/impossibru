@@ -578,7 +578,11 @@ def compile_project(raw: Any, path: Any = "<memory>") -> Project:
         raise ProjectError("export.normals must be 'radial' or 'surface'")
     if shell or normals == "surface":
         parts = {name: _surface(part, shell, normals == "surface") for name, part in parts.items()}
-    export = ExportSettings(str(out.get("name", project_path.stem)), width, height, scale,
+    export_name = str(out.get("name", project_path.stem))
+    if (not export_name or "/" in export_name or "\\" in export_name or export_name in (".", "..")
+            or Path(export_name).is_absolute()):
+        raise ProjectError("export.name must be a plain file name (no path separators)")
+    export = ExportSettings(export_name, width, height, scale,
                             (float(origin[0]), float(origin[1])), [float(x) for x in directions],
                             list(export_animations),
                             _color(out.get("background", [0, 0, 0, 0]), "export.background"), trim, shell, normals)

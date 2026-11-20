@@ -184,6 +184,15 @@ class EditorAPITests(unittest.TestCase):
         status, _, _ = self.call("POST", "/api/export", {"document": document})
         self.assertEqual(status, 422)
 
+    def test_export_rejects_path_escaping_name(self):
+        status, _, body = self.call("GET", "/api/project")
+        document = json.loads(body)["document"]
+        document.setdefault("export", {})["name"] = "../escape-me"
+        before = set(Path(tempfile.gettempdir()).glob("escape-me*"))
+        status, _, _ = self.call("POST", "/api/export", {"document": document})
+        self.assertEqual(status, 422)
+        self.assertEqual(set(Path(tempfile.gettempdir()).glob("escape-me*")), before)
+
     def test_auth_and_host_rejections(self):
         status, _, _ = self.call("GET", "/api/project", token=False)
         self.assertEqual(status, 403)

@@ -262,3 +262,18 @@ describe('Schema Rejection on Corrupt / Invalid Projects', () => {
     expect(() => validateProject(doc)).toThrow(/export\.animations must be a non-empty animation-name list/);
   });
 });
+
+describe('Final review validation', () => {
+  it('rejects path-like export names', () => {
+    for (const bad of ['', '../x', 'a/b', 'a\\b', '/abs', '.', '..']) {
+      const doc = starterProject('nm') as any;
+      doc.export = { ...(doc.export || {}), name: bad };
+      expect(() => validateProject(doc), JSON.stringify(bad)).toThrow(
+        'export.name must be a plain file name (no path separators)'
+      );
+    }
+    const ok = starterProject('nm') as any;
+    ok.export = { ...(ok.export || {}), name: 'my.sheet-1' };
+    expect(() => validateProject(ok)).not.toThrow();
+  });
+});

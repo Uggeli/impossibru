@@ -926,6 +926,12 @@ export function validateProject(d: ProjectDocument): ProjectDocument {
       throw new ProjectError('export size and scale must be positive integers');
     }
   }
+  if (ex.name !== undefined) {
+    const nm = String(ex.name);
+    if (!nm || /[/\\]/.test(nm) || nm === '.' || nm === '..') {
+      throw new ProjectError('export.name must be a plain file name (no path separators)');
+    }
+  }
   if (ex.scale !== undefined && (!Number.isInteger(ex.scale) || ex.scale < 1)) {
     throw new ProjectError('export size and scale must be positive integers');
   }

@@ -1,4 +1,5 @@
 import './style.css';
+import { offersSilhouetteSync, paletteCharError, partKeyDisplay } from './editorrules';
 import { load as parseYaml } from 'js-yaml';
 import { activeParts, validateProject } from './engine';
 import { setProjectHandle, readDraft, persistDraft, autoRig, browserRequest, exportProjectZip, packageExportZip, openProject, recoverDraft, starterProject } from './runtime';
@@ -1106,7 +1107,7 @@ async function addColor() {
   const char = await modalPrompt({
     title: 'Add Palette Color',
     placeholder: 'Palette character (one character)',
-    validate: (v) => (v.length !== 1 || v === '.' || state.doc.palette[v] !== undefined) ? 'Choose one unused character other than .' : null
+    validate: (v) => paletteCharError(v, state.doc.palette)
   });
   if (!char) return;
 
@@ -1120,7 +1121,7 @@ async function renameColor(old: string) {
   const char = await modalPrompt({
     title: 'Rename Palette Character',
     defaultValue: old,
-    validate: (v) => (v.length !== 1 || v === '.' || (v !== old && state.doc.palette[v] !== undefined)) ? 'Choose one unused character other than .' : null
+    validate: (v) => paletteCharError(v, state.doc.palette, old)
   });
   if (!char || char === old) return;
 
@@ -1165,7 +1166,7 @@ function showError(message: string, info: any = null) {
   msgSpan.textContent = message;
   banner.append(msgSpan);
 
-  if (message.includes('silhouette') || message.includes('front/back silhouettes differ')) {
+  if (offersSilhouetteSync(message, state.doc ? selectedSpec() : undefined)) {
     const syncBtn = document.createElement('button');
     syncBtn.id = 'bannerSyncBtn';
     syncBtn.className = 'banner-action-btn';
@@ -1623,8 +1624,10 @@ function renderKeyInspector() {
     select.append(new Option('none', ''));
     Object.keys(state.doc.parts).forEach(p => select.append(new Option(p, p)));
     const clipName = state.selectedClip;
-    const shown = activeParts(state.doc, clipName, +$('frame').value, state.mutedTracks)[state.selectedBone];
-    select.value = shown ?? '';
+    select.value = partKeyDisplay(
+      key,
+      key ? null : activeParts(state.doc, clipName, +$('frame').value)[state.selectedBone]
+    );
     select.onchange = () => {
       checkpoint();
       putKey('bones', state.selectedBone, 'part', select.value || null);

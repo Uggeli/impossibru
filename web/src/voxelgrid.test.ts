@@ -54,3 +54,14 @@ describe('voxelgrid', () => {
     expect(usesChar({ front: 'a', back: 'a', side: 'a' }, 'q')).toBe(false);
   });
 });
+
+describe('gridFromSpec bounds', () => {
+  test('huge run count returns promptly capped at w*h*d cells', async () => {
+    const { gridFromSpec } = await import('./voxelgrid');
+    const t = Date.now();
+    const g = gridFromSpec({ size: [2, 2, 2], voxels: '99999999999r' } as GridPartSpec);
+    expect(Date.now() - t).toBeLessThan(1000);
+    expect(g.cells.length).toBe(8);
+    expect(g.cells.every(c => c === 'r')).toBe(true);
+  });
+});

@@ -90,8 +90,12 @@ export function usesChar(spec: PartSpec, ch: string): boolean {
 export function gridFromSpec(p: GridPartSpec): VoxelGrid {
   const [w, h, d] = p.size as number[];
   const cells: string[] = [];
-  for (const m of p.voxels.matchAll(/(\d*)(\D)/g)) {
-    for (let n = m[1] ? parseInt(m[1], 10) : 1; n > 0; n--) cells.push(m[2]);
+  const max = w * h * d;
+  outer: for (const m of p.voxels.matchAll(/(\d*)(\D)/g)) {
+    for (let n = m[1] ? parseInt(m[1], 10) : 1; n > 0; n--) {
+      if (cells.length >= max) break outer;
+      cells.push(m[2]);
+    }
   }
   while (cells.length < w * h * d) cells.push('.');
   cells.length = w * h * d;
