@@ -48,9 +48,12 @@
       </div>
       <div id="errorBanner" class="error-banner hidden"></div>
       <button id="allViews" hidden>Show all views</button><div class="views">
-        <article><h2><button data-focus="front">Front</button> <small>+Z</small></h2><div class="canvas-wrap"><canvas id="frontCanvas"></canvas></div></article>
-        <article><h2><button data-focus="side">Side</button> <small>±X</small></h2><div class="canvas-wrap"><canvas id="sideCanvas"></canvas></div></article>
-        <article><h2><button data-focus="back">Back</button> <small>−Z</small></h2><div class="canvas-wrap"><canvas id="backCanvas"></canvas></div></article>
+        <article data-kind="drawn"><h2><button data-focus="front">Front</button> <small>+Z</small></h2><div class="canvas-wrap"><canvas id="frontCanvas"></canvas></div></article>
+        <article data-kind="drawn"><h2><button data-focus="side">Side</button> <small>±X</small></h2><div class="canvas-wrap"><canvas id="sideCanvas"></canvas></div></article>
+        <article data-kind="drawn"><h2><button data-focus="back">Back</button> <small>−Z</small></h2><div class="canvas-wrap"><canvas id="backCanvas"></canvas></div></article>
+        <article data-kind="grid" class="slice-view" hidden><h2><span>Slice</span> <small>Y layers</small></h2>
+          <div class="slice-controls"><input id="sliceIndex" type="range" min="0" max="0" value="0" aria-label="Slice"><span id="sliceLabel">Slice 1 / 1</span><label><input id="sliceGhost" type="checkbox" checked> Ghost below</label></div>
+          <div class="canvas-wrap"><canvas id="sliceCanvas"></canvas></div></article>
       </div>
       <section class="palette panel">
         <div class="panel-title"><span>Palette</span><button id="addColor">Add color</button></div>

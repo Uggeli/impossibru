@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import yaml from 'js-yaml';
 import qio from '../../examples/qio.yaml?raw';
-import { decodeGrid, encodeGrid, getSlice, setSlice, resizeGrid3, isGridPart } from './voxelgrid';
+import { decodeGrid, encodeGrid, getSlice, setSlice, resizeGrid3, isGridPart, replaceChar, usesChar } from './voxelgrid';
 import type { GridPartSpec, ProjectDocument } from './types';
 
 describe('voxelgrid', () => {
@@ -42,5 +42,15 @@ describe('voxelgrid', () => {
     expect(getSlice(r, 1)).toEqual(['ab', 'cd']);
     expect(getSlice(r, 0)).toEqual(['..', '..']);
     expect(g.cells.every(c => c === '.')).toBe(true);
+  });
+  test('replaceChar swaps all cells', () => {
+    const g = decodeGrid({ size: [2, 1, 2], voxels: 'ab2a' }, 'p', { a: '#000', b: '#fff' });
+    expect(replaceChar(g, 'a', 'Z').cells).toEqual(['Z', 'b', 'Z', 'Z']);
+  });
+  test('usesChar covers grid cells and left/right views', () => {
+    expect(usesChar({ size: [2, 1, 1], voxels: 'ab' }, 'b')).toBe(true);
+    expect(usesChar({ size: [2, 1, 1], voxels: 'ab' }, 'c')).toBe(false);
+    expect(usesChar({ front: 'a', back: 'a', left: 'q', right: 'a' } as any, 'q')).toBe(true);
+    expect(usesChar({ front: 'a', back: 'a', side: 'a' }, 'q')).toBe(false);
   });
 });

@@ -8,7 +8,6 @@ import {
   canvasCell,
   fastFloodFill,
   reconcileSilhouette,
-  replaceColorInPart,
   isValidHex,
   paletteHex
 } from './canvas';
@@ -19,6 +18,7 @@ import {
   modalColorReplace
 } from './modal';
 import type { PartSpec, Color } from './types';
+import { isGridPart, gridFromSpec, encodeGrid, getSlice, setSlice, resizeGrid3, usesChar, replaceCharInPart } from './voxelgrid';
 
 const token = typeof location !== 'undefined' ? (new URLSearchParams(location.search).get('token') || '') : '';
 const $ = (id: string): any => document.getElementById(id);
@@ -30,7 +30,7 @@ const apiHeaders = { 'Content-Type': 'application/json', 'X-SpriteBuilder-Token'
 
 const state: any = {
   doc: null, sourceHash: '', summary: null, part: null, color: null, tool: 'pencil', mode: 'part',
-  mirror: false,
+  mirror: false, slice: 0,
   revision: 0, dirty: false, valid: false, error: null, errorInfo: null, history: [], future: [],
   drawing: false, dragStart: null, dragCurrent: null, dragView: null,
   hoverView: null, hoverX: -1, hoverY: -1, lastCell: null,
@@ -73,10 +73,29 @@ export function cleanAnimationTracks(doc: any) {
   }
 }
 
+function isGridSelected(): boolean {
+  const part = state.doc?.parts?.[state.part];
+  return !!part && isGridPart(part);
+}
+function clampSlice() {
+  const part = state.doc?.parts?.[state.part];
+  const h = part && isGridPart(part) ? part.size[1] : 1;
+  state.slice = Math.max(0, Math.min(h - 1, Math.floor(+state.slice || 0)));
+}
 function rows(view: string): string[] {
+  if (view === 'slice') {
+    clampSlice();
+    return getSlice(gridFromSpec(selectedSpec() as any), state.slice);
+  }
   return state.doc.parts[state.part][view].replace(/^\n|\n$/g, '').split('\n');
 }
 function setRows(view: string, value: string[]) {
+  if (view === 'slice') {
+    const spec = selectedSpec() as any, g = gridFromSpec(spec);
+    if (value.length !== g.d || value.some(r => r.length !== g.w)) return;
+    spec.voxels = encodeGrid(setSlice(g, state.slice, value));
+    return;
+  }
   state.doc.parts[state.part][view] = value.join('\n');
 }
 function selectedSpec(): PartSpec {
@@ -238,10 +257,10 @@ async function replaceColorPrompt(char: string) {
 
   checkpoint();
   if (res.scope === 'part') {
-    replaceColorInPart(state.doc.parts[state.part], res.fromChar, res.toChar);
+    replaceCharInPart(state.doc.parts[state.part], res.fromChar, res.toChar);
   } else {
     Object.values(state.doc.parts).forEach(part => {
-      replaceColorInPart(part as PartSpec, res.fromChar, res.toChar);
+      replaceCharInPart(part as PartSpec, res.fromChar, res.toChar);
     });
   }
   renderCanvases();
@@ -386,6 +405,13 @@ function renderPalette() {
 }
 
 function renderDimensions() {
+  if (isGridSelected()) {
+    const [w, h, d] = (selectedSpec() as any).size;
+    $('partWidth').value = w;
+    $('partHeight').value = h;
+    $('partDepth').value = d;
+    return;
+  }
   const front = rows('front'), side = rows('side');
   $('partWidth').value = front[0].length;
   $('partHeight').value = front.length;
@@ -393,7 +419,30 @@ function renderDimensions() {
 }
 
 function renderCanvases() {
+  const grid = isGridSelected();
+  document.querySelectorAll<HTMLElement>('.views article[data-kind]').forEach(a => a.hidden = (a.dataset.kind === 'grid') !== grid);
+  $('syncSilhouette').hidden = grid;
+  if (grid) {
+    clampSlice();
+    const h = (selectedSpec() as any).size[1];
+    const range = $('sliceIndex');
+    range.max = String(h - 1);
+    range.value = String(state.slice);
+    $('sliceLabel').textContent = `Slice ${state.slice + 1} / ${h}`;
+    drawCanvas('slice');
+    return;
+  }
   ['front', 'side', 'back'].forEach(drawCanvas);
+}
+
+function goToSlice(y: number) {
+  if (!isGridSelected()) return;
+  const before = state.slice;
+  state.slice = y;
+  clampSlice();
+  if (state.slice === before) return;
+  renderCanvases();
+  schedulePreview();
 }
 
 function drawCanvas(view: string) {
@@ -423,6 +472,19 @@ function drawCanvas(view: string) {
   // Background
   ctx.fillStyle = '#0e1015';
   ctx.fillRect(0, 0, logicalWidth, logicalHeight);
+
+  // Ghost of the slice below (onion skin)
+  if (view === 'slice' && ($('sliceGhost') as HTMLInputElement).checked && state.slice > 0) {
+    const below = getSlice(gridFromSpec(selectedSpec() as any), state.slice - 1);
+    ctx.save();
+    ctx.globalAlpha = 0.25;
+    below.forEach((row, y) => [...row].forEach((char, x) => {
+      if (char === '.') return;
+      ctx.fillStyle = paletteHex(state.doc.palette[char] || '#ff00ff');
+      ctx.fillRect(x * cell + 1, y * cell + 1, cell - 2, cell - 2);
+    }));
+    ctx.restore();
+  }
 
   // Voxel Grid Cells
   grid.forEach((row, y) => [...row].forEach((char, x) => {
@@ -683,6 +745,21 @@ function writeCell(view: string, x: number, y: number, char: string) {
   return true;
 }
 
+function floodFillRows(x: number, y: number, char: string) {
+  const g = rows('slice').map(r => [...r]);
+  if (y < 0 || y >= g.length || x < 0 || x >= g[0].length) return;
+  const target = g[y][x];
+  if (target === char) return;
+  const stack: Array<[number, number]> = [[x, y]];
+  while (stack.length) {
+    const [cx, cy] = stack.pop()!;
+    if (cy < 0 || cy >= g.length || cx < 0 || cx >= g[0].length || g[cy][cx] !== target) continue;
+    g[cy][cx] = char;
+    stack.push([cx + 1, cy], [cx - 1, cy], [cx, cy + 1], [cx, cy - 1]);
+  }
+  setRows('slice', g.map(r => r.join('')));
+}
+
 function applySingleTool(view: string, x: number, y: number) {
   const grid = rows(view);
   const cols = grid[0].length;
@@ -703,7 +780,7 @@ function applySingleTool(view: string, x: number, y: number) {
     const targetChar = grid[y]?.[x];
     if (targetChar && targetChar !== '.' && targetChar !== state.color) {
       checkpoint();
-      replaceColorInPart(state.doc.parts[state.part], targetChar, state.color);
+      replaceCharInPart(state.doc.parts[state.part], targetChar, state.color);
       renderCanvases();
       changed();
     }
@@ -714,12 +791,11 @@ function applySingleTool(view: string, x: number, y: number) {
 
   if (state.tool === 'fill') {
     checkpoint();
-    fastFloodFill(state.doc.parts[state.part], view as any, x, y, char, state.color);
+    const fill = view === 'slice' ? floodFillRows : (px: number, py: number) => fastFloodFill(state.doc.parts[state.part], view as any, px, py, char, state.color);
+    fill(x, y, char);
     if (state.mirror) {
       const mx = cols - 1 - x;
-      if (mx !== x) {
-        fastFloodFill(state.doc.parts[state.part], view as any, mx, y, char, state.color);
-      }
+      if (mx !== x) fill(mx, y, char);
     }
     renderCanvases();
     changed();
@@ -972,6 +1048,19 @@ async function resizePart() {
   if ([nw, nh, nd].some(n => !Number.isInteger(n) || n < 1 || n > 64)) {
     return modalAlert({ title: 'Invalid Dimensions', message: 'Dimensions must be integers from 1 to 64.' });
   }
+  if (isGridSelected()) {
+    const spec = selectedSpec() as any, [ow, oh, od] = spec.size as number[];
+    if (nw === ow && nh === oh && nd === od) return;
+    checkpoint();
+    const resized = resizeGrid3(gridFromSpec(spec), nw, nh, nd);
+    const ox = Math.floor((nw - ow) / 2), oz = Math.floor((nd - od) / 2);
+    const p = spec.pivot || [(ow - 1) / 2, 0, (od - 1) / 2];
+    spec.size = [nw, nh, nd];
+    spec.voxels = encodeGrid(resized);
+    spec.pivot = [+p[0] + ox, +p[1], +p[2] + oz];
+    changed();
+    return;
+  }
   const f = rows('front'), s = rows('side'), ow = f[0].length, oh = f.length, od = s[0].length;
   if (nw === ow && nh === oh && nd === od) return;
 
@@ -1011,13 +1100,13 @@ async function renameColor(old: string) {
   const palette: Record<string, Color> = {};
   entries(state.doc.palette).forEach(([k, v]) => palette[k === old ? char : k] = v);
   state.doc.palette = palette;
-  values(state.doc.parts).forEach(part => ['front', 'back', 'side'].forEach(view => part[view] = part[view].split(old).join(char)));
+  values(state.doc.parts).forEach(part => replaceCharInPart(part, old, char));
   state.color = char;
   changed();
 }
 
 async function deleteColor(char: string) {
-  const used = values(state.doc.parts).some(part => ['front', 'back', 'side'].some(view => part[view].includes(char)));
+  const used = values(state.doc.parts).some(part => usesChar(part, char));
   if (used) {
     return modalAlert({ title: 'Color In Use', message: `Color ${char} is still used by a part. Erase or replace it first.` });
   }
@@ -1118,7 +1207,9 @@ async function updatePreview() {
     part: state.part,
     direction: +$('yaw').value,
     clip: $('clip').value,
-    frame: +$('frame').value
+    frame: +$('frame').value,
+    // Slice highlight is drawn by the browser (TS) renderer only; the Python server ignores it.
+    ...(state.mode === 'part' && isGridSelected() ? { slice: state.slice } : {})
   };
   try {
     const res = await request('/api/preview', { method: 'POST', body: JSON.stringify(payload) });
@@ -2976,8 +3067,11 @@ $('showHandles').onchange = () => {
 // Workspace Selection
 document.querySelectorAll<HTMLElement>('[data-workspace]').forEach(button => button.onclick = () => setWorkspace(button.dataset.workspace || 'parts'));
 
+$('sliceIndex').oninput = () => goToSlice(+$('sliceIndex').value);
+$('sliceGhost').onchange = () => renderCanvases();
+
 // Canvas Binding
-['front', 'side', 'back'].forEach(bindCanvas);
+['front', 'side', 'back', 'slice'].forEach(bindCanvas);
 
 // Mirror & Sync Silhouette Buttons
 $('mirrorToggle').onclick = () => {
@@ -3125,6 +3219,9 @@ window.addEventListener('keydown', event => {
   } else if ((event.code === 'Space' || event.key === ' ') && (!target?.closest('button') || state.workspace === 'animate' && !target.closest('.time-ruler, #transport, .workspace-tabs'))) {
     event.preventDefault();
     togglePlayback();
+  } else if ((event.key === 'ArrowUp' || event.key === 'ArrowDown') && state.workspace === 'parts' && isGridSelected()) {
+    event.preventDefault();
+    goToSlice(state.slice + (event.key === 'ArrowUp' ? 1 : -1));
   } else if (event.key === '[') {
     event.preventDefault();
     setAnimationFrame(+$('frame').value - 1);

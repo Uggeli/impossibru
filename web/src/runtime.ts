@@ -494,7 +494,9 @@ export async function browserRequest(path: string, options: any = {}) {
           p.frame,
           p.direction,
           p.mode === 'part' ? p.part : undefined,
-          p.mode === 'part' ? 320 : undefined
+          p.mode === 'part' ? 320 : undefined,
+          undefined,
+          p.mode === 'part' && Number.isInteger(p.slice) ? p.slice : undefined
         );
       return response({ dataUrl: canvas.toDataURL('image/png') });
     }

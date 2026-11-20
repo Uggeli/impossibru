@@ -72,3 +72,38 @@ export function resizeGrid3(g: VoxelGrid, w: number, h: number, d: number): Voxe
   }
   return { w, h, d, cells };
 }
+
+export function replaceChar(g: VoxelGrid, from: string, to: string): VoxelGrid {
+  return { ...g, cells: g.cells.map(c => (c === from ? to : c)) };
+}
+
+/** True when the palette char appears in any drawn view or grid cell of the part. */
+export function usesChar(spec: PartSpec, ch: string): boolean {
+  const s = spec as Record<string, any>;
+  if (typeof s.voxels === 'string' && /\d*\D/.test(s.voxels)) {
+    for (const m of s.voxels.matchAll(/\d*(\D)/g)) if (m[1] === ch) return true;
+  }
+  return ['front', 'back', 'side', 'left', 'right'].some(v => typeof s[v] === 'string' && s[v].includes(ch));
+}
+
+/** Lenient decode for editing: no palette or emptiness checks (a slice may be erased to nothing). */
+export function gridFromSpec(p: GridPartSpec): VoxelGrid {
+  const [w, h, d] = p.size as number[];
+  const cells: string[] = [];
+  for (const m of p.voxels.matchAll(/(\d*)(\D)/g)) {
+    for (let n = m[1] ? parseInt(m[1], 10) : 1; n > 0; n--) cells.push(m[2]);
+  }
+  while (cells.length < w * h * d) cells.push('.');
+  cells.length = w * h * d;
+  return { w, h, d, cells };
+}
+
+/** Replace a palette char everywhere in a part (mutates), keeping grid encoding canonical. */
+export function replaceCharInPart(spec: PartSpec, from: string, to: string): void {
+  if (!from || !to || from === to) return;
+  const s = spec as Record<string, any>;
+  for (const v of ['front', 'back', 'side', 'left', 'right']) {
+    if (typeof s[v] === 'string') s[v] = s[v].split(from).join(to);
+  }
+  if (isGridPart(spec)) spec.voxels = encodeGrid(replaceChar(gridFromSpec(spec), from, to));
+}

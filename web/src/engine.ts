@@ -1105,6 +1105,7 @@ function voxels(d: ProjectDocument, p: string) {
         p: [x - piv[0], y - piv[1], z - piv[2]],
         c: color(d.palette[ch]),
         n: [rad[0] / len, rad[1] / len, rad[2] / len],
+        gy: y,
       });
     });
     return out;
@@ -1154,7 +1155,8 @@ export function render(
   yaw = 0,
   part?: string,
   size?: number,
-  mutedTracks?: Set<string>
+  mutedTracks?: Set<string>,
+  highlightSlice?: number
 ): HTMLCanvasElement {
   const ex = d.export || {},
     w = size || ex.size?.[0] || 96,
@@ -1189,6 +1191,7 @@ export function render(
         y: origin[1] - p[1] * scale,
         z,
         c: v.c,
+        hl: v.gy !== undefined && v.gy === highlightSlice,
       });
     }
   } else {
@@ -1208,6 +1211,7 @@ export function render(
           y: origin[1] - p[1] * scale,
           z,
           c: v.c,
+          hl: v.gy !== undefined && v.gy === highlightSlice,
         });
       }
     }
@@ -1218,6 +1222,13 @@ export function render(
       y0 = Math.floor(v.y - scale / 2);
     ctx.fillStyle = `rgba(${v.c[0]},${v.c[1]},${v.c[2]},${v.c[3] / 255})`;
     ctx.fillRect(x0, y0, scale, scale);
+  }
+  // Editor slice highlight: one voxel-tall layer drawn on top.
+  if (highlightSlice !== undefined) {
+    ctx.fillStyle = 'rgba(102,217,163,0.55)';
+    for (const v of all) {
+      if (v.hl) ctx.fillRect(Math.floor(v.x - scale / 2), Math.floor(v.y - scale / 2), scale, scale);
+    }
   }
   return canvas;
 }
