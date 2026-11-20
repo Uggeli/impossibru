@@ -8,6 +8,7 @@ import json
 import mimetypes
 from pathlib import Path
 import secrets
+import tempfile
 import threading
 from typing import Any, Dict
 from urllib.parse import urlparse
@@ -15,6 +16,7 @@ import webbrowser
 
 from .animation import evaluate_pose, evaluate_rest_pose
 from .autorig import autorig_document_data
+from .exporter import build_project
 from .document import (EditableDocument, SaveConflict, create_document, load_document,
                        save_document, structured_error)
 from .project import ProjectError, compile_project
@@ -178,6 +180,14 @@ def _handler(session: EditorSession):
                     self.send_header("Cache-Control", "no-store")
                     self.end_headers()
                     self.wfile.write(content)
+                elif route == "/api/export" and method == "POST":
+                    with tempfile.TemporaryDirectory() as out:
+                        png_path, json_path = build_project(project, Path(out))
+                        self._json(200, {
+                            "name": png_path.stem,
+                            "png": base64.b64encode(png_path.read_bytes()).decode("ascii"),
+                            "json": json.loads(json_path.read_text()),
+                        })
                 elif route == "/api/rig/preview" and method == "POST":
                     direction = float(payload.get("direction", 0))
                     mode = payload.get("mode", "rest")

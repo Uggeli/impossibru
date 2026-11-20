@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { browserRequest, exportProjectZip, recoverDraft, starterProject } from './runtime';
+import { unzipSync } from 'fflate';
+import { browserRequest, exportProjectZip, packageExportZip, recoverDraft, starterProject } from './runtime';
 import { setupTestEnvironment } from './test-helpers';
 import { validateProject } from './engine';
 
@@ -220,5 +221,20 @@ describe('Project Export (exportProjectZip)', () => {
     });
 
     expect(maxProgress).toBe(100);
+  });
+});
+
+describe('packageExportZip', () => {
+  it('zips the supplied PNG and metadata verbatim', async () => {
+    setupTestEnvironment();
+    let blob: any;
+    (globalThis as any).URL.createObjectURL = (b: Blob) => { blob = b; return 'blob:x'; };
+    const png = new Uint8Array([137, 80, 78, 71, 1, 2, 3]);
+    packageExportZip(starterProject('server_made'), png, { size: { w: 4, h: 5 } }, false);
+    const files = unzipSync(new Uint8Array(await blob.arrayBuffer()));
+    expect(Array.from(files['server_made.png'])).toEqual(Array.from(png));
+    expect(JSON.parse(new TextDecoder().decode(files['server_made.json']))).toEqual({ size: { w: 4, h: 5 } });
+    expect(files['server_made.yaml']).toBeDefined();
+    expect(files['player/index.html']).toBeUndefined();
   });
 });

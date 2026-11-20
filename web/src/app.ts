@@ -1,7 +1,7 @@
 import './style.css';
 import { load as parseYaml } from 'js-yaml';
 import { validateProject } from './engine';
-import { setProjectHandle, readDraft, persistDraft, autoRig, browserRequest, exportProjectZip, openProject, recoverDraft, starterProject } from './runtime';
+import { setProjectHandle, readDraft, persistDraft, autoRig, browserRequest, exportProjectZip, packageExportZip, openProject, recoverDraft, starterProject } from './runtime';
 import {
   bresenhamLine,
   rectPoints,
@@ -3103,6 +3103,7 @@ $('exportZipButton').onclick = () => {
   $('exportAngle').value = '';
   $('exportError').textContent = '';
   renderExportSettings();
+  $('exportBrowserNote').hidden = !!token;
   $('exportDialog').showModal();
 };
 $('cancelExport').onclick = () => $('exportDialog').close();
@@ -3115,7 +3116,13 @@ $('confirmExport').onclick = async () => {
   }
   try {
     $('status').textContent = 'Exporting…';
-    await exportProjectZip(clone(state.doc), p => { $('status').textContent = `Exporting ${p}%`; }, $('includePlayer').checked);
+    if (token) {
+      const result = await (await request('/api/export', { method: 'POST', body: JSON.stringify({ document: clone(state.doc) }) })).json();
+      const png = Uint8Array.from(atob(result.png), c => c.charCodeAt(0));
+      packageExportZip(clone(state.doc), png, result.json, $('includePlayer').checked);
+    } else {
+      await exportProjectZip(clone(state.doc), p => { $('status').textContent = `Exporting ${p}%`; }, $('includePlayer').checked);
+    }
     $('status').textContent = 'Export ready';
   } catch (error: any) {
     showError(error.message);

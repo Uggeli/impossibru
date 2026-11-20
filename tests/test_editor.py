@@ -153,6 +153,37 @@ class EditorAPITests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertTrue(yaml.safe_load(self.path.read_text())["editor_extension"]["api"])
 
+    def test_export_builds_posted_document_not_disk_file(self):
+        from spritebuilder.exporter import build_project
+        import base64
+        status, _, body = self.call("GET", "/api/project")
+        document = json.loads(body)["document"]
+        edited = copy.deepcopy(document)
+        # recolour a used palette entry so the render differs from the file on disk
+        edited["palette"]["r"] = "#00ff00"
+        status, _, body = self.call("POST", "/api/export", {"document": edited})
+        self.assertEqual(status, 200)
+        result = json.loads(body)
+        project = compile_project(edited, self.path)
+        with tempfile.TemporaryDirectory() as out:
+            png_path, json_path = build_project(project, Path(out))
+            expected_png = png_path.read_bytes()
+            expected_meta = json.loads(json_path.read_text())
+            expected_name = png_path.stem
+        self.assertEqual(base64.b64decode(result["png"]), expected_png)
+        self.assertEqual(result["json"], expected_meta)
+        self.assertEqual(result["name"], expected_name)
+        with tempfile.TemporaryDirectory() as out:
+            disk_png, _ = build_project(compile_project(document, self.path), Path(out))
+            self.assertNotEqual(base64.b64decode(result["png"]), disk_png.read_bytes())
+
+    def test_export_rejects_broken_document(self):
+        status, _, body = self.call("GET", "/api/project")
+        document = json.loads(body)["document"]
+        document["parts"] = "nope"
+        status, _, _ = self.call("POST", "/api/export", {"document": document})
+        self.assertEqual(status, 422)
+
     def test_auth_and_host_rejections(self):
         status, _, _ = self.call("GET", "/api/project", token=False)
         self.assertEqual(status, 403)

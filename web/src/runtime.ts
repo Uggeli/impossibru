@@ -653,6 +653,24 @@ function download(blob: Blob, name: string) {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
+export function packageExportZip(d: ProjectDocument, png: Uint8Array, meta: object, includePlayer: boolean): void {
+  const base = d.export?.name || 'sprite',
+    files: any = {
+      [`${base}.png`]: png,
+      [`${base}.json`]: strToU8(JSON.stringify(meta, null, 2) + '\n'),
+      [`${base}.yaml`]: strToU8(yaml.dump(d, { noRefs: true, lineWidth: -1 })),
+    };
+  if (includePlayer) {
+    files['player/index.html'] = strToU8(playerPage.replace('../../dist/humanoid.json', () => '../' + encodeURIComponent(base) + '.json'));
+    files['player/sprite-player.js'] = strToU8(playerModule);
+    files['player/decode-voxels.js'] = strToU8(voxelDecoder);
+  }
+  download(
+    new Blob([zipSync(files)] as any, { type: 'application/zip' }),
+    `${base}.zip`
+  );
+}
+
 export async function exportProjectZip(
   d: ProjectDocument,
   progress = (p: number) => {},
@@ -688,20 +706,6 @@ export async function exportProjectZip(
       'image/png'
     )
   );
-  const base = d.export?.name || 'sprite',
-    files: any = {
-      [`${base}.png`]: png,
-      [`${base}.json`]: strToU8(JSON.stringify(meta, null, 2) + '\n'),
-      [`${base}.yaml`]: strToU8(yaml.dump(d, { noRefs: true, lineWidth: -1 })),
-    };
-  if (includePlayer) {
-    files['player/index.html'] = strToU8(playerPage.replace('../../dist/humanoid.json', () => '../' + encodeURIComponent(base) + '.json'));
-    files['player/sprite-player.js'] = strToU8(playerModule);
-    files['player/decode-voxels.js'] = strToU8(voxelDecoder);
-  }
-  download(
-    new Blob([zipSync(files)] as any, { type: 'application/zip' }),
-    `${base}.zip`
-  );
+  packageExportZip(d, png, meta, includePlayer);
   progress(100);
 }

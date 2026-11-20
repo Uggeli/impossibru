@@ -27,3 +27,11 @@ test('exported player loads the actual metadata and draws the sprite', async ({p
     canvas.getContext('2d')!.getImageData(0,0,canvas.width,canvas.height).data.some(channel => channel > 0)
   )).toBe(true);
 });
+
+test('browser export dialog warns that it is a quick preview', async ({page}) => {
+  await page.goto('/');
+  await page.locator('#welcomeNew').click();
+  await page.locator('#exportZipButton').click();
+  await expect(page.locator('#exportBrowserNote')).toBeVisible();
+  await expect(page.locator('#exportBrowserNote')).toHaveText('Browser export is a quick preview: no lighting, trim, or shell. Use "impossibru edit" for final spritesheets.');
+});
