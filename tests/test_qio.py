@@ -141,6 +141,48 @@ class QioTests(unittest.TestCase):
             for k in bones.get("torso", {}).get("rotation", []):
                 self.assertLessEqual(abs(k["value"][1]), 10, name)
 
+    def test_point_clips_reach_target_side_and_height(self):
+        _, project = load()
+        yaw = {"left": 315, "right": 45}
+        for side in ("left", "right"):
+            arm = "left" if side == "right" else "right"  # the arm nearer the target
+            for height in ("up", "level", "down"):
+                with self.subTest(side=side, height=height):
+                    clip = project.clips[f"point_{side}_{height}"]
+                    self.assertFalse(clip.loop)
+                    pose = evaluate_pose(project, clip, clip.frames - 1)
+                    cam = camera_yaw(yaw[side])
+                    hand = cam @ pose[f"{arm}_hand"][:3, 3]
+                    head = cam @ pose["head"][:3, 3]
+                    shoulder_y = (cam @ pose[f"{arm}_arm"][:3, 3])[1]
+                    dx = hand[0] - head[0]
+                    self.assertGreater(dx if side == "right" else -dx, 4)
+                    dy = hand[1] - shoulder_y
+                    if height == "up":
+                        self.assertGreater(dy, 3)
+                    elif height == "level":
+                        self.assertLess(abs(dy), 3)
+                    else:
+                        self.assertLess(dy, -3)
+
+    def test_point_arm_visible_in_its_view(self):
+        _, project = load()
+        yaw = {"left": 315, "right": 45}
+        for side in ("left", "right"):
+            arm = "left" if side == "right" else "right"
+            for height in ("up", "level", "down"):
+                with self.subTest(side=side, height=height):
+                    clip = project.clips[f"point_{side}_{height}"]
+                    last = clip.frames - 1
+                    pose = evaluate_pose(project, clip, last)
+                    parts = active_parts(project, clip, last)
+                    hidden = {**parts, f"{arm}_arm": None, f"{arm}_hand": None}
+                    if arm == "left":
+                        hidden["tablet"] = None  # the tablet rides on the left hand
+                    a = np.asarray(render_pose(project, pose, yaw[side], parts=parts))
+                    b = np.asarray(render_pose(project, pose, yaw[side], parts=hidden))
+                    self.assertGreater(int((a != b).any(axis=2).sum()), 60)
+
     def test_qio_shell_enabled(self):
         raw, _ = load()
         self.assertIs(raw["export"]["shell"], True)

@@ -504,6 +504,34 @@ def assistant_clips():
     }
 
 
+POINT_HEIGHTS = {"up": 1.1, "level": 0.05, "down": -1.0}  # arm direction dy per height
+
+
+def point_clips():
+    """point_{side}_{height}: shown at yaw 45 (right) / 315 (left); points with the arm nearer the target."""
+    zero = [0, 0, 0]
+    clips = {}
+    for side, sx in (("right", 1), ("left", -1)):  # +X (character's left) is screen-right at yaw 45
+        arm, other = ("left", "right") if side == "right" else ("right", "left")
+        other_rest = TABLET_ARM if other == "left" else [0, 0, -4]
+        arm_rest = TABLET_ARM if arm == "left" else [0, 0, -4]
+        for height, dy in POINT_HEIGHTS.items():
+            target = aim(sx * 1.0, dy, 0.8)
+            overshoot = aim(sx * 1.0, dy + 0.15, 0.7)
+            clips[f"point_{side}_{height}"] = {"frames": 8, "fps": 10, "loop": False, "bones": {
+                "root": {"translation": [key(0, zero), key(2, [0, 0.6, 0]), key(4, zero)]},
+                "torso": {"rotation": [key(0, zero), key(4, [0, sx * 8, 0])]},
+                f"{arm}_arm": {"rotation": [key(0, arm_rest), key(3, overshoot), key(5, target)],
+                               # reach: shoulder slides forward/out so the hand clears the big head
+                               "translation": [key(0, zero), key(4, [sx * 1, 1, 2.5])]},
+                f"{other}_arm": {"rotation": [key(0, other_rest)]},
+                "head": {"rotation": [key(0, zero), key(4, [-6 * dy, sx * 12, -sx * 4])]},
+                "face": {"part": [part_key(0, "face_happy"), part_key(3, "face_wink"), part_key(5, "face_happy")]},
+                "antenna": {"rotation": [key(0, zero), key(3, [0, 0, -sx * 14]), key(6, [0, 0, sx * 6]), key(7, zero)]},
+            }}
+    return clips
+
+
 def build():
     parts = {
         "head": head(), "antenna": antenna(), "torso": torso(), "backpack": backpack(),
@@ -566,6 +594,7 @@ def build():
         }},
     }
     animations.update(assistant_clips())
+    animations.update(point_clips())
     return {
         "palette": PALETTE, "parts": parts, "rig": {"bones": bones}, "animations": animations,
         "export": {"name": "qio", "size": [128, 168], "scale": 3, "origin": [64, 160],
