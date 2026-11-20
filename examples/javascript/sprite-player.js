@@ -28,3 +28,42 @@ export async function loadSprite(metadataUrl) {
     }
   };
 }
+
+// Sequences clips on a loaded sprite: one-shots that return to idle, loops, held poses, pointing.
+// `now` is the caller's millisecond clock; a clip starts on the first draw after it is chosen.
+export function createController(sprite, { idle = 'idle', angle = 0, pointYaw = { left: 315, right: 45 } } = {}) {
+  const check = name => {
+    if (!sprite.animations[name]) throw new Error(`Unknown clip: ${name}`);
+    return name;
+  };
+  let state = { clip: check(idle), mode: 'loop', then: null, start: null };
+  const set = (clip, mode, then = null) => { state = { clip: check(clip), mode, then, start: null }; };
+  const duration = name => {
+    const a = sprite.animations[name];
+    return a.directions[0].frames.length * a.frame_duration_ms;
+  };
+  return {
+    get clip() { return state.clip; },
+    play(clip, { then = idle } = {}) { check(then); set(clip, 'once', then); },
+    loop(clip) { set(clip, 'loop'); },
+    hold(clip) { set(clip, 'hold'); },
+    setAngle(deg) { angle = deg; },
+    pointAt(fromX, fromY, toX, toY) {
+      const dx = toX - fromX;
+      const side = dx < 0 ? 'left' : 'right';
+      const a = Math.atan2(fromY - toY, Math.abs(dx)) * 180 / Math.PI;
+      const height = a > 25 ? 'up' : a < -25 ? 'down' : 'level';
+      const clip = check(`point_${side}_${height}`);
+      angle = pointYaw[side];
+      set(clip, 'hold');
+    },
+    draw(ctx, { x, y, scale = 1, now }) {
+      if (state.start === null) state.start = now;
+      if (state.mode === 'once' && now - state.start >= duration(state.clip)) {
+        state = { clip: state.then, mode: 'loop', then: null, start: now };
+      }
+      sprite.draw(ctx, { clip: state.clip, angle, elapsedMs: now - state.start, x, y, scale });
+      return state.clip;
+    },
+  };
+}

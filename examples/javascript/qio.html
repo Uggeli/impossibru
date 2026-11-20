@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Qio vocabulary</title>
+<style>
+  body { background:#fdf3f4; color:#1a1a1a; font:1rem system-ui; margin:2rem auto; max-width:40rem; padding:0 1rem; }
+  canvas { display:block; width:100%; image-rendering:pixelated; background:#fff; border-radius:12px; margin:1rem 0; cursor:crosshair; }
+  button { margin:0.2rem; padding:0.35rem 0.7rem; border:1px solid #e60012; background:#fff; color:#b0000e; border-radius:999px; cursor:pointer; }
+  button.loop { background:#ffe6e8; }
+  #now { font-weight:600; }
+</style>
+<h1>Qio vocabulary</h1>
+<p>Build first: <code>python3 -m spritebuilder build examples/qio.yaml</code>. Then serve the repository root and open this page.
+Filled buttons loop, outlined ones play once and return to idle. Click the canvas to point at that spot.</p>
+<div id="buttons"></div>
+<label>Angle <select id="angle"><option>0</option><option>45</option><option>315</option></select></label>
+<span>Now playing: <span id="now"></span></span>
+<canvas width="480" height="320" data-atlas="../../dist/qio.json"></canvas>
+<p id="error" role="alert"></p>
+<script type="module">
+  import { loadSprite, createController } from './sprite-player.js';
+  const canvas = document.querySelector('canvas');
+  const ctx = canvas.getContext('2d');
+  const scale = 2, qx = canvas.width / 2, qy = canvas.height * 0.85;
+  try {
+    const sprite = await loadSprite(canvas.dataset.atlas);
+    const qio = createController(sprite);
+    const angle = document.querySelector('#angle');
+    angle.onchange = () => qio.setAngle(Number(angle.value));
+    for (const [name, clip] of Object.entries(sprite.animations)) {
+      if (name.startsWith('point_')) continue;
+      const button = document.createElement('button');
+      button.textContent = name;
+      if (clip.loop) button.className = 'loop';
+      button.onclick = () => clip.loop ? qio.loop(name) : qio.play(name);
+      document.querySelector('#buttons').append(button);
+    }
+    canvas.onclick = event => {
+      const r = canvas.getBoundingClientRect();
+      const x = (event.clientX - r.left) * canvas.width / r.width;
+      const y = (event.clientY - r.top) * canvas.height / r.height;
+      qio.pointAt(qx, qy - 60, x, y);  // from about Qio's shoulder
+      angle.value = String(x < qx ? 315 : 45);
+    };
+    ctx.imageSmoothingEnabled = false;
+    function paint(now) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      document.querySelector('#now').textContent = qio.draw(ctx, { x: qx, y: qy, scale, now });
+      requestAnimationFrame(paint);
+    }
+    requestAnimationFrame(paint);
+  } catch (error) {
+    document.querySelector('#error').textContent = error.message;
+  }
+</script>
+</html>
