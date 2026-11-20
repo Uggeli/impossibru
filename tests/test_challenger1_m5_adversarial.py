@@ -7,6 +7,8 @@ Conducts adversarial stress testing on:
 4. Backend API REST Endpoints (malformed JSON, huge bodies, invalid types, auth/host guards, error codes).
 """
 
+from __future__ import annotations
+
 import http.client
 import json
 import math

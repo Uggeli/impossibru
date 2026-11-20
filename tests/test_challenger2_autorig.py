@@ -1,4 +1,6 @@
 """Adversarial stress-testing suite for Backend Autorig API Route & Integration (Challenger 2)."""
+from __future__ import annotations
+
 import json
 import socket
 import tempfile
