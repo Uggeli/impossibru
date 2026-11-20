@@ -1,16 +1,21 @@
-"""Generate examples/qio.yaml: Qio, the PayiQ mascot, as voxel-grid parts."""
+"""Generate examples/qio.yaml: Qio, the PayiQ mascot, as voxel-grid parts.
+
+Environment toggles (for experiments; defaults produce the shipped example):
+  QIO_NORMALS  export.normals mode, default "surface".
+  QIO_SHELL    "1" (default) enables export.shell, "0" disables it.
+"""
 from __future__ import annotations
 
 import math
+import os
 import sys
 from pathlib import Path
 
 import numpy as np
 import yaml
 
-import os
 NORMALS = os.environ.get("QIO_NORMALS", "surface")
-SHELL = os.environ.get("QIO_SHELL", "0") == "1"
+SHELL = os.environ.get("QIO_SHELL", "1") == "1"
 
 PALETTE = {
     "r": "#E60012",  # primary red
@@ -72,7 +77,8 @@ def ellipsoid(cx, cy, cz, rx, ry, rz):
     return lambda x, y, z: ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 + ((z - cz) / rz) ** 2 <= 1.0
 
 
-def head():
+def head(expression: str = "open"):
+    """expression: open | blink (both eyes closed arcs) | wink (left eye, +X, closed)."""
     W, H, D = 29, 21, 24
     cx, cy, cz, R = 14, 10, 10, 9.6
     g = Grid(W, H, D)
@@ -118,12 +124,21 @@ def head():
             return "w" if (dx < 0 and dy >= 1) else "k"
         return None
 
+    def closed_eye(x, y, ex):
+        # happy closed eye: a 3-wide "n" arc (ends one row below the crown)
+        d = abs(x - ex)
+        if (y == cy + 1 and d <= 1) or (y == cy and d == 1):
+            return "k"
+        return None
+
+    closed = {"open": (), "blink": (cx - 3, cx + 3), "wink": (cx + 3,)}[expression]
+
     def face(x, y):
         dx, dy = x - cx, y - cy
         if math.sqrt(dx * dx + dy * dy) >= face_r:
             return None
         for ex in (cx - 3, cx + 3):
-            c = eye(x, y, ex)
+            c = closed_eye(x, y, ex) if ex in closed else eye(x, y, ex)
             if c:
                 return c
         if 4 <= abs(dx) <= 5.5 and -2.5 <= dy <= -1.5:
@@ -164,12 +179,6 @@ def torso():
 
     g.fill(body)
     g.fill(lambda x, y, z: "R" if y >= 8 and z <= 2 and abs(x - cx) <= 4 and ((x - cx) / 4.5) ** 2 + ((z - 1.5) / 2) ** 2 <= 1 else None)
-    q = ["..www..",
-         ".w...w.",
-         "w.....w",
-         "w...w.w",
-         ".w...ww",
-         "..wwwww"]
     q = [".www.",
          "w...w",
          "w...w",
@@ -250,9 +259,13 @@ def key(frame, value, interp="smooth"):
     return {"frame": frame, "value": value, "interpolation": interp}
 
 
+def part_key(frame, value):
+    return {"frame": frame, "value": value}
+
+
 def build():
     parts = {
-        "head": head(), "antenna": antenna(), "torso": torso(), "backpack": backpack(),
+        "head": head(), "head_blink": head("blink"), "head_wink": head("wink"), "antenna": antenna(), "torso": torso(), "backpack": backpack(),
         "sleeve": sleeve(), "hand": hand(), "leg": leg(), "shoe": shoe(), "tablet": tablet(),
     }
     bones = {
@@ -275,7 +288,8 @@ def build():
     animations = {
         "idle": {"frames": 8, "fps": 8, "loop": True, "bones": {
             "root": {"translation": [key(0, zero), key(4, [0, -0.6, 0])]},
-            "head": {"rotation": [key(0, [0, 0, -3]), key(4, [0, 0, 3])]},
+            "head": {"rotation": [key(0, [0, 0, -3]), key(4, [0, 0, 3])],
+                     "part": [part_key(5, "head_blink"), part_key(6, "head")]},
             "antenna": {"rotation": [key(0, [0, 0, 10]), key(4, [0, 0, -10])]},
             "left_arm": {"rotation": [key(0, [-55, 0, 0])]},
             "right_arm": {"rotation": [key(0, [0, 0, -4]), key(4, [0, 0, 4])]},
@@ -295,7 +309,8 @@ def build():
             "root": {"translation": [key(0, zero), key(4, [0, 0.5, 0])]},
             "right_arm": {"rotation": [key(0, [-60, 0, -150]), key(4, [-60, 0, -135])]},
             "left_arm": {"rotation": [key(0, [-55, 0, 0])]},
-            "head": {"rotation": [key(0, [0, 0, 6]), key(4, [0, 0, 2])]},
+            "head": {"rotation": [key(0, [0, 0, 6]), key(4, [0, 0, 2])],
+                     "part": [part_key(2, "head_wink"), part_key(6, "head")]},
             "antenna": {"rotation": [key(0, [0, 0, -12]), key(4, [0, 0, 12])]},
         }},
     }

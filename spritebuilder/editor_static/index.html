@@ -10,8 +10,8 @@
   <meta property="og:title" content="Impossibru!">
   <meta property="og:image" content="./social-preview.png">
   <link rel="icon" href="./favicon.png">
-  <script type="module" crossorigin src="./assets/index-BoCGmCdk.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-Is31fdqg.css">
+  <script type="module" crossorigin src="./assets/index-JVEELDCm.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DfhhzGXp.css">
 </head>
 <body>
   <header>
@@ -47,14 +47,20 @@
           <button data-tool="eyedropper">Pick <kbd>I</kbd></button>
           <button id="mirrorToggle" title="Toggle vertical symmetry mode (M)">Mirror <kbd>M</kbd></button>
           <button id="syncSilhouette" title="Reconcile front and back silhouettes">Sync Silhouette</button>
+          <label id="separateSidesLabel"><input id="separateSides" type="checkbox"> Separate left/right</label>
         </div>
         <div><button id="undoButton">Undo</button><button id="redoButton">Redo</button></div>
       </div>
       <div id="errorBanner" class="error-banner hidden"></div>
       <button id="allViews" hidden>Show all views</button><div class="views">
-        <article><h2><button data-focus="front">Front</button> <small>+Z</small></h2><div class="canvas-wrap"><canvas id="frontCanvas"></canvas></div></article>
-        <article><h2><button data-focus="side">Side</button> <small>±X</small></h2><div class="canvas-wrap"><canvas id="sideCanvas"></canvas></div></article>
-        <article><h2><button data-focus="back">Back</button> <small>−Z</small></h2><div class="canvas-wrap"><canvas id="backCanvas"></canvas></div></article>
+        <article data-kind="drawn"><h2><button data-focus="front">Front</button> <small>+Z</small></h2><div class="canvas-wrap"><canvas id="frontCanvas"></canvas></div></article>
+        <article data-kind="drawn" data-sides="single"><h2><button data-focus="side">Side</button> <small>±X</small></h2><div class="canvas-wrap"><canvas id="sideCanvas"></canvas></div></article>
+        <article data-kind="drawn" data-sides="split" hidden><h2><button data-focus="left">Left</button> <small>+X</small></h2><div class="canvas-wrap"><canvas id="leftCanvas"></canvas></div></article>
+        <article data-kind="drawn" data-sides="split" hidden><h2><button data-focus="right">Right</button> <small>−X</small></h2><div class="canvas-wrap"><canvas id="rightCanvas"></canvas></div></article>
+        <article data-kind="drawn"><h2><button data-focus="back">Back</button> <small>−Z</small></h2><div class="canvas-wrap"><canvas id="backCanvas"></canvas></div></article>
+        <article data-kind="grid" class="slice-view" hidden><h2><span>Slice</span> <small>Y layers</small></h2>
+          <div class="slice-controls"><input id="sliceIndex" type="range" min="0" max="0" value="0" aria-label="Slice"><span id="sliceLabel">Slice 1 / 1</span><label><input id="sliceGhost" type="checkbox" checked> Ghost below</label></div>
+          <div class="canvas-wrap"><canvas id="sliceCanvas"></canvas></div></article>
       </div>
       <section class="palette panel">
         <div class="panel-title"><span>Palette</span><button id="addColor">Add color</button></div>
@@ -123,6 +129,7 @@
     <div id="exportDirections"></div>
     <label for="exportAngle">Yaw in degrees</label>
     <input type="number" id="exportAngle"> <button id="addExportDirection">Add direction</button>
+    <p id="exportBrowserNote" class="hint">Browser export is a quick preview: no lighting, trim, or shell. Use "impossibru edit" for final spritesheets.</p>
     <p id="exportError" role="alert"></p>
     <label><input type="checkbox" id="includePlayer"> Include JavaScript player and decoder</label>
     <div class="export-actions">
