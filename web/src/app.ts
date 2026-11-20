@@ -1107,7 +1107,7 @@ async function addColor() {
   const char = await modalPrompt({
     title: 'Add Palette Color',
     placeholder: 'Palette character (one character)',
-    validate: (v) => paletteCharError(v, state.doc.palette)
+    validate: (v) => paletteCharError(v, state.doc.palette, undefined, state.doc.parts)
   });
   if (!char) return;
 
@@ -1121,7 +1121,7 @@ async function renameColor(old: string) {
   const char = await modalPrompt({
     title: 'Rename Palette Character',
     defaultValue: old,
-    validate: (v) => paletteCharError(v, state.doc.palette, old)
+    validate: (v) => paletteCharError(v, state.doc.palette, old, state.doc.parts)
   });
   if (!char || char === old) return;
 

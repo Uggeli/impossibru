@@ -30,3 +30,15 @@ describe('partKeyDisplay', () => {
     expect(partKeyDisplay(null, null)).toBe('');
   });
 });
+
+describe('paletteCharError with grid parts', () => {
+  const pal = { r: '#f00' };
+  it('rejects digits/whitespace only when a grid part exists', () => {
+    const msg = "Digits and spaces can't be colour keys in projects with 3D grid parts";
+    for (const v of ['1', ' ']) {
+      expect(paletteCharError(v, pal, undefined, { a: viewPart, g: gridPart })).toBe(msg);
+      expect(paletteCharError(v, pal, undefined, { a: viewPart })).toBeNull();
+    }
+    expect(paletteCharError('x', pal, undefined, { g: gridPart })).toBeNull();
+  });
+});
