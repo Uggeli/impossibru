@@ -4,5 +4,5 @@ export interface DrawnPartSpec{front:string;back:string;side?:string;left?:strin
 export interface GridPartSpec{size:Vec3;voxels:string;pivot?:Vec3;[key:string]:unknown}
 export type PartSpec=DrawnPartSpec|GridPartSpec
 export interface BoneSpec{parent?:string;translation?:Vec3;rotation?:Vec3;part?:string;attachment?:{translation?:Vec3;rotation?:Vec3;[key:string]:unknown};[key:string]:unknown}
-export interface ClipSpec{frames:number;fps:number;loop?:boolean;bones?:Record<string,{translation?:Key<Vec3>[];rotation?:Key<Vec3>[]}>;ik?:Record<string,{target?:Key<Vec3>[];pole?:Key<Vec3>[];weight?:Key<number>[]}>;[key:string]:unknown}
+export interface ClipSpec{frames:number;fps:number;loop?:boolean;bones?:Record<string,{translation?:Key<Vec3>[];rotation?:Key<Vec3>[];part?:Key<string|null>[]}>;ik?:Record<string,{target?:Key<Vec3>[];pole?:Key<Vec3>[];weight?:Key<number>[]}>;[key:string]:unknown}
 export interface ProjectDocument{palette:Record<string,Color>;parts:Record<string,PartSpec>;rig:{bones:Record<string,BoneSpec>;ik_chains?:Record<string,{root:string;mid:string;end:string}>;[key:string]:unknown};animations:Record<string,ClipSpec>;export?:{name?:string;size?:Vec2;scale?:number;origin?:Vec2;directions?:number[];animations?:string[];background?:Color;[key:string]:unknown};[key:string]:unknown}

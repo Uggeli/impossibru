@@ -1,6 +1,6 @@
 import './style.css';
 import { load as parseYaml } from 'js-yaml';
-import { validateProject } from './engine';
+import { activeParts, validateProject } from './engine';
 import { setProjectHandle, readDraft, persistDraft, autoRig, browserRequest, exportProjectZip, packageExportZip, openProject, recoverDraft, starterProject } from './runtime';
 import {
   bresenhamLine,
@@ -1009,13 +1009,29 @@ async function renamePart() {
   entries(state.doc.parts).forEach(([key, value]) => replaced[key === old ? name : key] = value);
   state.doc.parts = replaced;
   values(state.doc.rig?.bones || {}).forEach(b => { if (b.part === old) b.part = name; });
+  partKeys().forEach(k => { if (k.value === old) k.value = name; });
   state.part = name;
   changed();
+}
+
+function partKeys(): any[] {
+  return values(state.doc.animations || {}).flatMap((clip: any) =>
+    values(clip?.bones || {}).flatMap((t: any) => t?.part || []));
+}
+
+function animationUsingPart(part: string): string | null {
+  const hit = entries(state.doc.animations || {}).find(([, clip]: [string, any]) =>
+    values(clip?.bones || {}).some((t: any) => (t?.part || []).some((k: any) => k.value === part)));
+  return hit ? hit[0] : null;
 }
 
 async function deletePart() {
   if (Object.keys(state.doc.parts).length === 1) {
     return modalAlert({ title: 'Cannot Delete Part', message: 'A project must contain at least one part.' });
+  }
+  const usedBy = animationUsingPart(state.part);
+  if (usedBy) {
+    return modalAlert({ title: 'Cannot Delete Part', message: `Part '${state.part}' is used by animation '${usedBy}'` });
   }
   const refs = entries(state.doc.rig?.bones || {}).filter(([, b]) => b.part === state.part).map(([n]) => n);
   const detail = refs.length ? ` It will detach bones: ${refs.join(', ')}.` : '';
@@ -1432,7 +1448,8 @@ function putKey(group: string, name: string, track: string, value: any) {
   const clip = state.doc.animations[state.selectedClip], bucket = (clip[group] ??= {})[name] ??= {};
   const keys = bucket[track] ??= [];
   const frame = +$('frame').value, index = keys.findIndex((k: any) => k.frame === frame);
-  const key = { frame, value, interpolation: index >= 0 ? (keys[index].interpolation || 'linear') : 'linear' };
+  const key: any = { frame, value };
+  if (track !== 'part') key.interpolation = index >= 0 ? (keys[index].interpolation || 'linear') : 'linear';
   if (index >= 0) keys[index] = key; else keys.push(key);
   keys.sort((a: any, b: any) => a.frame - b.frame);
 }
@@ -1586,16 +1603,36 @@ function renderKeyInspector() {
       }));
     }
   }
-  if (key) {
+  if (!state.selectedChain && state.selectedTrack === 'part' && state.selectedBone) {
+    const label = document.createElement('label');
+    label.textContent = 'Part ';
     const select = document.createElement('select');
-    ['linear', 'smooth', 'step'].forEach(v => select.append(new Option(v, v)));
-    select.value = key.interpolation || 'linear';
+    select.id = 'partKeySelect';
+    select.append(new Option('none', ''));
+    Object.keys(state.doc.parts).forEach(p => select.append(new Option(p, p)));
+    const clipName = state.selectedClip;
+    const shown = activeParts(state.doc, clipName, +$('frame').value, state.mutedTracks)[state.selectedBone];
+    select.value = shown ?? '';
     select.onchange = () => {
       checkpoint();
-      key.interpolation = select.value;
+      putKey('bones', state.selectedBone, 'part', select.value || null);
       changed();
     };
-    box.append(select);
+    label.append(select);
+    box.append(label);
+  }
+  if (key) {
+    if (state.selectedChain || state.selectedTrack !== 'part') {
+      const select = document.createElement('select');
+      ['linear', 'smooth', 'step'].forEach(v => select.append(new Option(v, v)));
+      select.value = key.interpolation || 'linear';
+      select.onchange = () => {
+        checkpoint();
+        key.interpolation = select.value;
+        changed();
+      };
+      box.append(select);
+    }
 
     const delKeyBtn = document.createElement('button');
     delKeyBtn.className = 'danger';
@@ -2311,7 +2348,7 @@ function renderTimeline() {
   if (state.workspace !== 'animate') return;
   const clip = state.doc?.animations?.[state.selectedClip];
   if (!clip) return;
-  const tracks = state.selectedChain ? ['target', 'pole', 'weight'] : ['translation', 'rotation'];
+  const tracks = state.selectedChain ? ['target', 'pole', 'weight'] : ['translation', 'rotation', 'part'];
   const ruler = document.createElement('div');
   ruler.className = 'time-ruler';
   ruler.style.setProperty('--frames', clip.frames);

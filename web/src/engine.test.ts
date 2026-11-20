@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { metadata, pose, render, validateProject } from './engine';
+import { activeParts, metadata, pose, render, validateProject } from './engine';
 import { starterProject } from './runtime';
 import type { ProjectDocument } from './types';
 import yaml from 'js-yaml';
@@ -524,5 +524,80 @@ describe('Voxel-grid parts (qio example)', () => {
       doc2.createElement = create;
     }
     expect(opaque).toBeGreaterThan(0);
+  });
+});
+
+describe('Part swap tracks', () => {
+  function swapDoc(keys: any[], loop = true): ProjectDocument {
+    const d = starterProject('swap');
+    d.parts.alt = { ...structuredClone(d.parts.part) };
+    d.rig.bones = { root: { part: 'part', translation: [0, 0, 0], rotation: [0, 0, 0] } } as any;
+    d.animations = { idle: { frames: 8, fps: 8, loop, bones: { root: { part: keys } } } } as any;
+    return d;
+  }
+  const key = (frame: number, value: any) => ({ frame, value });
+
+  it('uses the rig part before the first key', () => {
+    const d = swapDoc([key(2, 'alt')]);
+    expect(activeParts(d, 'idle', 0).root).toBe('part');
+    expect(activeParts(d, 'idle', 1).root).toBe('part');
+  });
+
+  it('step-holds until the next key', () => {
+    const d = swapDoc([key(2, 'alt')]);
+    expect(activeParts(d, 'idle', 2).root).toBe('alt');
+    expect(activeParts(d, 'idle', 5).root).toBe('alt');
+  });
+
+  it('wraps the last key in looping clips only with several keys', () => {
+    expect(activeParts(swapDoc([key(1, 'alt'), key(3, 'part')]), 'idle', 0).root).toBe('part');
+    expect(activeParts(swapDoc([key(1, 'part'), key(3, 'alt')]), 'idle', 0).root).toBe('alt');
+    expect(activeParts(swapDoc([key(1, 'part'), key(3, 'alt')], false), 'idle', 0).root).toBe('part');
+    expect(activeParts(swapDoc([key(3, 'alt')]), 'idle', 0).root).toBe('part');
+  });
+
+  it('uses the rig part with no clip and when the track is muted', () => {
+    const d = swapDoc([key(0, 'alt')]);
+    expect(activeParts(d, undefined, 0).root).toBe('part');
+    expect(activeParts(d, 'idle', 0, new Set(['root.part'])).root).toBe('part');
+  });
+
+  it('null hides the part in render', () => {
+    const d = swapDoc([key(1, null)]);
+    expect(activeParts(d, 'idle', 1).root).toBeNull();
+    setupTestEnvironment();
+    const count = (f: number) => {
+      let n = 0;
+      const ctx: any = {
+        clearRect() {},
+        fillStyle: '',
+        fillRect() { n++; },
+      };
+      const doc2: any = document;
+      const create = doc2.createElement;
+      doc2.createElement = (tag: string) =>
+        tag === 'canvas' ? { width: 0, height: 0, getContext: () => ctx } : create(tag);
+      try {
+        render(d, 'idle', f);
+      } finally {
+        doc2.createElement = create;
+      }
+      return n;
+    };
+    expect(count(0)).toBeGreaterThan(0);
+    expect(count(1)).toBe(0);
+  });
+
+  it('rejects missing parts, bad values and interpolation', () => {
+    expect(() => validateProject(swapDoc([key(0, 'nope')]))).toThrow(
+      "animations.idle.bones.root.part references missing part 'nope'"
+    );
+    expect(() => validateProject(swapDoc([key(0, 5)]))).toThrow(
+      'animations.idle.bones.root.part[0].value must be a part name or null'
+    );
+    expect(() => validateProject(swapDoc([{ ...key(0, 'alt'), interpolation: 'step' }]))).toThrow(
+      'animations.idle.bones.root.part[0].interpolation is not allowed on part keys'
+    );
+    expect(() => validateProject(swapDoc([]))).toThrow(/non-empty keyframe list/);
   });
 });

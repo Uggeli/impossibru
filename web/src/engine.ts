@@ -458,7 +458,9 @@ function validateKeys(
       );
     }
     last = frame;
-    if (width === 1) {
+    if (width === 0) {
+      // part keys: value checked by the caller
+    } else if (width === 1) {
       if (typeof key.value !== 'number' || !Number.isFinite(key.value)) {
         throw new ProjectError(`${label} values must be numbers`);
       }
@@ -800,12 +802,35 @@ export function validateProject(d: ProjectDocument): ProjectDocument {
         throw new ProjectError(`${label}.bones.${bName} must be a mapping`);
       }
       for (const [tName, track] of Object.entries(tracks)) {
-        if (tName !== 'translation' && tName !== 'rotation') {
+        if (tName !== 'translation' && tName !== 'rotation' && tName !== 'part') {
           throw new ProjectError(
             `${label}.bones.${bName}: unknown track '${tName}'`
           );
         }
-        validateKeys(track, `${label}.bones.${bName}.${tName}`, clip.frames, 3);
+        const trackLabel = `${label}.bones.${bName}.${tName}`;
+        if (tName === 'part') {
+          validateKeys(track, trackLabel, clip.frames, 0);
+          for (const key of track as any[]) {
+            if ('interpolation' in key) {
+              throw new ProjectError(
+                `${trackLabel}[${key.frame}].interpolation is not allowed on part keys`
+              );
+            }
+            const v = key.value;
+            if (v !== null && typeof v !== 'string') {
+              throw new ProjectError(
+                `${trackLabel}[${key.frame}].value must be a part name or null`
+              );
+            }
+            if (v !== null && !Object.prototype.hasOwnProperty.call(d.parts, v)) {
+              throw new ProjectError(
+                `${trackLabel} references missing part '${v}'`
+              );
+            }
+          }
+        } else {
+          validateKeys(track, trackLabel, clip.frames, 3);
+        }
       }
     }
     for (const [cName, tracks] of Object.entries(ikTracks)) {
@@ -957,6 +982,28 @@ const sample = (
     ? a.map((x: number, i: number) => x * (1 - t) + b[i] * t)
     : a * (1 - t) + b * t;
 };
+
+export function activeParts(
+  d: ProjectDocument,
+  clipName: string | undefined,
+  frame: number,
+  mutedTracks?: Set<string>
+): Record<string, string | null> {
+  const result: Record<string, string | null> = {};
+  for (const [n, b] of Object.entries(d.rig.bones)) result[n] = b.part ?? null;
+  const clip = clipName ? d.animations[clipName] : undefined;
+  if (!clip) return result;
+  const loop = clip.loop !== false;
+  for (const [n, tracks] of Object.entries(clip.bones ?? {})) {
+    const keys = (tracks as any)?.part as Key<string | null>[] | undefined;
+    if (!keys?.length || !(n in result)) continue;
+    if (mutedTracks?.has(`${n}.part`) || mutedTracks?.has(n)) continue;
+    if (frame < keys[0].frame && !(loop && keys.length > 1)) continue;
+    const prior = [...keys].reverse().find((k) => k.frame <= frame);
+    result[n] = (prior ?? keys[keys.length - 1]).value;
+  }
+  return result;
+}
 
 export function pose(
   d: ProjectDocument,
@@ -1176,6 +1223,7 @@ export function render(
     ctx.fillRect(0, 0, w, h);
   }
   const ps = pose(d, clip, frame, mutedTracks),
+    active = activeParts(d, clip, frame, mutedTracks),
     all: any[] = [];
   const yawR = (yaw * Math.PI) / 180,
     c = Math.cos(yawR),
@@ -1197,12 +1245,13 @@ export function render(
   } else {
     for (const [bn, b] of targetBones) {
       if (part && b.part !== part) continue;
-      if (!b.part) continue;
+      const drawn = active[bn];
+      if (!drawn) continue;
       const at = mul(
         ps[bn],
         transform(b.attachment?.rotation, b.attachment?.translation)
       );
-      for (const v of voxels(d, b.part)) {
+      for (const v of voxels(d, drawn)) {
         const p = mv(at, v.p),
           x = c * p[0] + s * p[2],
           z = -s * p[0] + c * p[2];

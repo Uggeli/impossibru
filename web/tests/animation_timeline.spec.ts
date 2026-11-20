@@ -50,9 +50,10 @@ test.describe('Animation Timeline & Playback Controls (Tiers 1-4)', () => {
 
   test('Tier 1: Timeline renders track rows for selected bone', async ({ page }) => {
     const trackRows = page.locator('#timeline .track-row');
-    await expect(trackRows).toHaveCount(2); // translation & rotation
+    await expect(trackRows).toHaveCount(3); // translation, rotation & part
     await expect(trackRows.nth(0).locator('button').first()).toHaveText('translation');
     await expect(trackRows.nth(1).locator('button').first()).toHaveText('rotation');
+    await expect(trackRows.nth(2).locator('button').first()).toHaveText('part');
   });
 
   test('Tier 1: Frame selection on timeline updates current frame indicator and value', async ({ page }) => {
@@ -531,3 +532,69 @@ test.describe('Animation Timeline & Playback Controls (Tiers 1-4)', () => {
   });
 });
 
+
+const swapYaml = `
+palette: {x: '#66D9A3', r: '#D96666'}
+parts:
+  head: {pivot: [1.5, 0, 1.5], front: "....\\n....\\n.xx.\\n.xx.", back: "....\\n....\\n.xx.\\n.xx.", side: "....\\n....\\n.xx.\\n.xx."}
+  head_alt: {pivot: [1.5, 0, 1.5], front: "....\\n....\\n.rr.\\n.rr.", back: "....\\n....\\n.rr.\\n.rr.", side: "....\\n....\\n.rr.\\n.rr."}
+rig:
+  bones: {head: {part: head}}
+animations:
+  idle: {frames: 8, fps: 10, loop: true, bones: {}}
+export: {name: swap, size: [96, 96], scale: 3, origin: [48, 88], directions: [0], animations: [idle], background: [0, 0, 0, 0]}
+`;
+
+test.describe('Part swap track', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(text => {
+      if (!sessionStorage.getItem('impossibru-yaml')) sessionStorage.setItem('impossibru-yaml', text);
+    }, swapYaml);
+    await page.goto('/');
+    await page.locator('button[data-workspace="animate"]').click();
+    await expect(page.locator('#timeline')).toBeVisible();
+    await page.locator('#timeline .track-row').filter({ hasText: 'part' }).locator('button').first().click();
+    await page.locator('#timeline .track-row').filter({ hasText: 'part' }).locator('button').nth(3).click();
+    await page.locator('#partKeySelect').selectOption('head_alt');
+    await expect(page.locator('#timeline .track-row').filter({ hasText: 'part' }).locator('button.key')).toHaveCount(1);
+  });
+
+  const stored = (page: any) => page.evaluate(() => JSON.parse(sessionStorage.getItem('impossibru-project')!));
+  async function respond(page: any, value?: string) {
+    await expect(page.locator('#modalOverlay')).toBeVisible();
+    if (value !== undefined) await page.locator('#modalInput').fill(value);
+    await page.locator('#modalConfirmButton').click();
+  }
+  async function selectPart(page: any, name: string) {
+    await page.locator('#partList button', { hasText: name }).click();
+  }
+
+  test('picking a part at a frame writes a step key without interpolation', async ({ page }) => {
+    await page.locator('#saveButton').click();
+    await expect(page.locator('#status')).toHaveText('Saved');
+    const doc = await stored(page);
+    expect(doc.animations.idle.bones.head.part).toEqual([{ frame: 2, value: 'head_alt' }]);
+  });
+
+  test('renaming the part rewrites the key', async ({ page }) => {
+    await page.locator('button[data-workspace="parts"]').click();
+    await selectPart(page, 'head_alt');
+    await page.locator('#renamePart').click();
+    await respond(page, 'head_b');
+    await page.locator('#saveButton').click();
+    await expect(page.locator('#status')).toHaveText('Saved');
+    const doc = await stored(page);
+    expect(doc.animations.idle.bones.head.part[0].value).toBe('head_b');
+  });
+
+  test('deleting a part used by a key is refused', async ({ page }) => {
+    await page.locator('button[data-workspace="parts"]').click();
+    await selectPart(page, 'head_alt');
+    await page.locator('#deletePart').click();
+    await expect(page.locator('#modalOverlay')).toContainText("Part 'head_alt' is used by animation 'idle'");
+    await page.locator('#modalConfirmButton').click();
+    await page.locator('#saveButton').click();
+    const doc = await stored(page);
+    expect(doc.parts.head_alt).toBeTruthy();
+  });
+});
