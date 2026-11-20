@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { metadata, pose, validateProject } from './engine';
+import { metadata, pose, render, validateProject } from './engine';
 import { starterProject } from './runtime';
 import type { ProjectDocument } from './types';
+import yaml from 'js-yaml';
+import qio from '../../examples/qio.yaml?raw';
+
 
 describe('Browser Project Contract & Backwards Compatibility', () => {
   it('validates the starter and keeps omitted animations backward compatible', () => {
@@ -492,3 +495,34 @@ describe('Runtime Rest-Mode Joint Drag & Autorig Integration', () => {
   });
 });
 
+
+describe('Voxel-grid parts (qio example)', () => {
+  it('validates the qio example', () => {
+    expect(() => validateProject(yaml.load(qio) as ProjectDocument)).not.toThrow();
+  });
+
+  it('renders qio with non-transparent pixels', () => {
+    setupTestEnvironment();
+    const doc = validateProject(yaml.load(qio) as ProjectDocument);
+    // The test canvas is a mock without pixel data: record the filled squares instead.
+    let opaque = 0;
+    const ctx: any = {
+      clearRect() {},
+      fillStyle: '',
+      fillRect() {
+        const alpha = /rgba\(\d+,\d+,\d+,([\d.]+)\)/.exec(ctx.fillStyle);
+        if (alpha && Number(alpha[1]) > 0) opaque++;
+      },
+    };
+    const doc2: any = document;
+    const create = doc2.createElement;
+    doc2.createElement = (tag: string) =>
+      tag === 'canvas' ? { width: 0, height: 0, getContext: () => ctx } : create(tag);
+    try {
+      render(doc, 'idle', 0, 0);
+    } finally {
+      doc2.createElement = create;
+    }
+    expect(opaque).toBeGreaterThan(0);
+  });
+});

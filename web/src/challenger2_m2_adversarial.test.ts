@@ -258,7 +258,7 @@ describe('Adversarial Color Replacement & Multi-Part Swaps', () => {
     expect(doc.parts.head.side).toBe('aaaa\na...\na...\naaaa');
 
     // Check dimensions still 4x4
-    const rows = doc.parts.head.front.split('\n');
+    const rows = (doc.parts.head.front as string).split('\n');
     expect(rows.length).toBe(4);
     expect(rows.every(r => r.length === 4)).toBe(true);
 

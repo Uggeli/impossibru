@@ -210,7 +210,7 @@ export function reconcileSilhouette(frontRows: string[], backRows: string[], fal
  * Replaces all occurrences of fromChar with toChar across front, back, and side views of a part.
  */
 export function replaceColorInPart(
-  part: { front: string; back: string; side: string; [key: string]: any },
+  part: Record<string, any>,
   fromChar: string,
   toChar: string
 ): void {

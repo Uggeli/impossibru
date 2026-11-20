@@ -1,4 +1,5 @@
 import type { Color, Key, ProjectDocument, Vec3 } from './types';
+import { decodeGrid, isGridPart } from './voxelgrid';
 
 export class ProjectError extends Error {}
 
@@ -508,6 +509,11 @@ export function validateProject(d: ProjectDocument): ProjectDocument {
   for (const [n, p] of Object.entries(d.parts)) {
     if (!p || typeof p !== 'object' || Array.isArray(p)) {
       throw new ProjectError('every part must be a mapping');
+    }
+    if (isGridPart(p)) {
+      decodeGrid(p, n, d.palette);
+      if (p.pivot !== undefined) vec(p.pivot, `parts.${n}.pivot`, 3);
+      continue;
     }
     const f = rows(p.front, `parts.${n}.front`),
       b = rows(p.back, `parts.${n}.back`),
@@ -1077,7 +1083,33 @@ export function pose(
 }
 
 function voxels(d: ProjectDocument, p: string) {
-  const q = d.parts[p],
+  const part = d.parts[p];
+  if (isGridPart(part)) {
+    const g = decodeGrid(part, p, d.palette),
+      cx = (g.w - 1) / 2,
+      cy = (g.h - 1) / 2,
+      cz = (g.d - 1) / 2,
+      sx = Math.max(cx, 0.5),
+      sy = Math.max(cy, 0.5),
+      sz = Math.max(cz, 0.5),
+      piv = part.pivot || ([cx, 0, cz] as Vec3),
+      out: any[] = [];
+    g.cells.forEach((ch, i) => {
+      if (ch === '.') return;
+      const x = i % g.w,
+        z = Math.floor(i / g.w) % g.d,
+        y = Math.floor(i / (g.w * g.d)),
+        rad = [(x - cx) / sx, (y - cy) / sy, (z - cz) / sz],
+        len = Math.max(Math.hypot(rad[0], rad[1], rad[2]), 1);
+      out.push({
+        p: [x - piv[0], y - piv[1], z - piv[2]],
+        c: color(d.palette[ch]),
+        n: [rad[0] / len, rad[1] / len, rad[2] / len],
+      });
+    });
+    return out;
+  }
+  const q = part,
     f = rows(q.front, ''),
     b = rows(q.back, ''),
     s = rows(q.side, ''),

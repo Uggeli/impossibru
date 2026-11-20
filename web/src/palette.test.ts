@@ -139,7 +139,7 @@ describe('Palette Operations & Document Integrity', () => {
     // 2. Update parts views
     for (const part of Object.values(doc.parts)) {
       for (const view of ['front', 'back', 'side'] as const) {
-        part[view] = part[view].split(oldChar).join(newChar);
+        (part as any)[view] = (part as any)[view].split(oldChar).join(newChar);
       }
     }
 
