@@ -177,8 +177,19 @@ def _voxelize(name: str, spec: Mapping[str, Any], palette: Mapping[str, Tuple[in
         return _voxel_grid(name, spec, palette)
     front = _grid(spec.get("front"), f"parts.{name}.front")
     back = _grid(spec.get("back"), f"parts.{name}.back")
-    side = _grid(spec.get("side"), f"parts.{name}.side")
-    for view_name, rows in (("front", front), ("back", back), ("side", side)):
+    has_lr = "left" in spec or "right" in spec
+    if "side" in spec and has_lr:
+        raise ProjectError(f"parts.{name}: use either side or left/right, not both")
+    if has_lr and not ("left" in spec and "right" in spec):
+        raise ProjectError(f"parts.{name}: left and right must both be given")
+    if has_lr:
+        side = _grid(spec.get("left"), f"parts.{name}.left")
+        right = _grid(spec.get("right"), f"parts.{name}.right")
+        views = (("front", front), ("back", back), ("left", side), ("right", right))
+    else:
+        side = right = _grid(spec.get("side"), f"parts.{name}.side")
+        views = (("front", front), ("back", back), ("side", side))
+    for view_name, rows in views:
         _validate_chars(rows, palette, f"parts.{name}.{view_name}")
     if len(front) != len(back) or len(front[0]) != len(back[0]):
         raise ProjectError(f"parts.{name}: front and back views must have equal dimensions")
@@ -188,6 +199,15 @@ def _voxelize(name: str, spec: Mapping[str, Any], palette: Mapping[str, Tuple[in
         for x in range(len(front[0])):
             if (front[y][x] == ".") != (back[y][x] == "."):
                 raise ProjectError(f"parts.{name}: front/back silhouettes differ at row {y + 1}, column {x + 1}")
+    if has_lr:
+        if len(right) != len(side):
+            raise ProjectError(f"parts.{name}: front, back, and side views must have equal heights")
+        for y in range(len(side)):
+            for z in range(max(len(side[0]), len(right[0]))):
+                l = side[y][z] if z < len(side[0]) else "."
+                r = right[y][z] if z < len(right[0]) else "."
+                if (l == ".") != (r == "."):
+                    raise ProjectError(f"parts.{name}: left/right silhouettes differ at row {y + 1}, column {z + 1}")
 
     h, w, d = len(front), len(front[0]), len(side[0])
     cx, cy, cz = (w - 1) / 2, (h - 1) / 2, (d - 1) / 2
@@ -209,7 +229,7 @@ def _voxelize(name: str, spec: Mapping[str, Any], palette: Mapping[str, Tuple[in
                 if abs(radial[2]) >= abs(radial[0]):
                     char = front[row][x] if radial[2] >= 0 else back[row][x]
                 else:
-                    char = side[row][z]
+                    char = side[row][z] if radial[0] >= 0 else right[row][z]
                 positions.append(local)
                 colors.append(palette[char])
                 normals.append(normal)
