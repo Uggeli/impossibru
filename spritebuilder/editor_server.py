@@ -225,14 +225,15 @@ def _handler(session: EditorSession):
                     viewport_offset = (project.export.width / 2, project.export.height / 2)
                     viewport_origin = (project.export.origin[0] + viewport_offset[0],
                                        project.export.origin[1] + viewport_offset[1])
+                    pick_runs = {}
                     image = render_pose(project, pose, direction, viewport_size, viewport_origin,
-                                        parts=active_parts(project, clip, frame))
+                                        parts=active_parts(project, clip, frame), pick_runs=pick_runs)
                     output = BytesIO()
                     image.save(output, format="PNG")
                     self._json(200, {
                         "png": base64.b64encode(output.getvalue()).decode("ascii"),
                         "overlay": overlay_geometry(project, pose, direction, clip, frame,
-                                                    viewport_offset, viewport_size),
+                                                    viewport_offset, viewport_size) | {"artwork": pick_runs},
                     })
                 elif route == "/api/rig/drag" and method == "POST":
                     screen = payload.get("screen")
@@ -242,7 +243,7 @@ def _handler(session: EditorSession):
                         data, str(payload.get("kind", "")), str(payload.get("name", "")),
                         screen, float(payload.get("direction", 0)), float(payload.get("depth", 0)),
                         str(payload.get("mode", "rest")), payload.get("clip"),
-                        int(payload.get("frame", 0)), session.document.path)
+                        int(payload.get("frame", 0)), session.document.path, payload.get("start"))
                     self._json(200, {"document": updated})
                 elif route == "/api/rig/reparent" and method == "POST":
                     bone = payload.get("bone")

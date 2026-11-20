@@ -36,9 +36,11 @@ def _conservative_pixels(projected: np.ndarray, scale: int):
 
 def render_pose(project: Project, pose: Dict[str, np.ndarray], direction: float,
                 size=None, origin=None,
-                parts: Optional[Dict[str, Optional[str]]] = None) -> Image.Image:
+                parts: Optional[Dict[str, Optional[str]]] = None,
+                pick_runs: Optional[dict] = None) -> Image.Image:
     positions, colors, normals = [], [], []
-    for name in project.bone_order:
+    owners = []
+    for bone_id, name in enumerate(project.bone_order, 1):
         bone = project.bones[name]
         part_name = parts.get(name, bone.part) if parts is not None else bone.part
         if not part_name:
@@ -49,6 +51,8 @@ def render_pose(project: Project, pose: Dict[str, np.ndarray], direction: float,
         positions.append((transform[:3, :3] @ part.positions.T).T + transform[:3, 3])
         normals.append((transform[:3, :3] @ part.normals.T).T)
         colors.append(part.colors)
+        if pick_runs is not None:
+            owners.append(np.full(len(part.colors), bone_id, dtype=np.int32))
     settings = project.export
     width, height = size or (settings.width, settings.height)
     render_origin = origin or settings.origin
@@ -81,6 +85,17 @@ def render_pose(project: Project, pose: Dict[str, np.ndarray], direction: float,
     px, py, depth, out_rgb, out_alpha = px[mask], py[mask], depth[mask], out_rgb[mask], out_alpha[mask]
     order = np.argsort(depth, kind="stable")
     px, py, out_rgb, out_alpha = px[order], py[order], out_rgb[order], out_alpha[order]
+    if pick_runs is not None:
+        # Reuse the footprint, clipping and depth ties of the displayed image.
+        ids = np.repeat(np.concatenate(owners), footprint)[mask][order]
+        owner = np.zeros((height, width), dtype=np.int32)
+        owner[py, px] = np.where(out_alpha > 0, ids, 0)
+        for y, row in enumerate(owner):
+            edges = np.flatnonzero(np.diff(row, prepend=0, append=0))
+            for start, end in zip(edges, edges[1:]):
+                if row[start]:
+                    name = project.bone_order[row[start] - 1]
+                    pick_runs.setdefault(name, []).append([y, int(start), int(end)])
     image[py, px, :3] = out_rgb
     image[py, px, 3] = out_alpha
     return Image.fromarray(image, "RGBA")

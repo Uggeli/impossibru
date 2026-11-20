@@ -10,8 +10,8 @@
   <meta property="og:title" content="Impossibru!">
   <meta property="og:image" content="./social-preview.png">
   <link rel="icon" href="./favicon.png">
-  <script type="module" crossorigin src="./assets/index-tydHi1ZR.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-DfhhzGXp.css">
+  <script type="module" crossorigin src="./assets/index-Bc1BvbTI.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DpVXQe7c.css">
 </head>
 <body>
   <header>
@@ -72,7 +72,7 @@
       <div id="rigBonesSection">
         <div class="panel-title"><span>Bones</span><div class="rig-bone-actions"><select id="autoRigPreset" class="compact-select" title="Autorig Preset"><option value="humanoid">Humanoid</option><option value="quadruped">Quadruped</option><option value="creature">Creature</option></select><button id="autoRigButton" title="Autorig character">Autorig</button><button id="addBone" title="Add bone">+</button></div></div>
         <div id="boneTree" class="tree"></div>
-        <div class="part-actions"><button id="renameBone">Rename</button><button id="reparentBone">Reparent</button><button id="deleteBone" class="danger">Delete</button></div>
+        <div class="part-actions rig-edit-actions"><button id="renameBone">Rename</button><button id="reparentBone">Reparent</button><button id="deleteBone" class="danger">Delete</button></div>
       </div>
       <div id="clipSection" class="hidden">
         <div class="panel-title"><span>Clips</span><button id="addClip">+</button></div>
@@ -93,9 +93,14 @@
 
     <section class="workspace rig-workspace hidden" data-pane="rigging">
       <div class="toolbar panel"><div><strong id="rigModeTitle">Rest pose</strong><button id="viewFront">Front</button><button id="viewSide">Side</button><label id="handlesControl" hidden><input type="checkbox" id="showHandles" checked> Show rig handles</label></div><div><button id="undoButtonRig">Undo</button><button id="redoButtonRig">Redo</button></div></div>
+      <div class="pose-tools" role="group" aria-label="Pose tools">
+        <button data-pose-tool="select" aria-keyshortcuts="Q">Select <kbd>Q</kbd></button>
+        <button data-pose-tool="move" aria-keyshortcuts="W"><span id="moveToolLabel">Move pivot</span> <kbd>W</kbd></button>
+        <button data-pose-tool="rotate" aria-keyshortcuts="E">Rotate <kbd>E</kbd></button>
+      </div>
       <div id="rigErrorBanner" class="error-banner hidden"></div>
       <div class="rig-main">
-        <div class="rig-stage preview-stage"><div class="checker"></div><img id="rigImage" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"><svg id="rigOverlay" viewBox="0 0 96 96" preserveAspectRatio="xMidYMid meet"></svg><div class="rig-help">Drag joints in the camera plane. Use numeric fields for depth and exact rotation.</div></div>
+        <div class="rig-stage preview-stage"><div class="checker"></div><img id="rigImage" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"><svg id="rigOverlay" viewBox="0 0 96 96" preserveAspectRatio="xMidYMid meet"></svg><div class="rig-help">Select a part or joint.</div></div>
         <aside class="bone-inspector panel"><div class="panel-title">Inspector</div><div id="boneInspector"></div><details><summary>Spring physics</summary><div id="springInspector"></div></details><details><summary>Constraints and limits</summary><div id="constraintInspector"></div></details><div id="keyInspector"></div></aside>
       </div>
       <div id="transport" hidden><output id="timeValue">Frame 0</output><button id="previousKey">Previous key</button><button id="nextKey">Next key</button><button id="deleteKey" class="danger">Delete key</button></div><div id="timeline" class="timeline hidden"></div>

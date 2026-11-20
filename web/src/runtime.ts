@@ -4,16 +4,15 @@ import voxelDecoder from '../../examples/javascript/decode-voxels.js?raw';
 import yaml from 'js-yaml';
 import { zipSync, strToU8 } from 'fflate';
 import {
-  inverseRigid,
   metadata,
-  mv,
   overlay,
-  pose,
   ProjectError,
   render,
   reparent,
   validateProject,
 } from './engine';
+import { applyRigDrag } from './rigdrag';
+import type { ArtworkRuns } from './engine';
 import type { ProjectDocument } from './types';
 
 let handle: any = null;
@@ -503,50 +502,13 @@ export async function browserRequest(path: string, options: any = {}) {
     if (path === '/api/rig/preview') {
       const p = JSON.parse(options.body),
         clip = p.mode === 'animate' ? p.clip : undefined,
-        canvas = render(d, clip, p.frame, p.direction);
+        artwork: ArtworkRuns = Object.create(null),
+        canvas = render(d, clip, p.frame, p.direction, undefined, undefined, undefined, undefined, artwork);
       const png = canvas.toDataURL('image/png').split(',')[1];
-      return response({ png, overlay: overlay(d, clip, p.frame, p.direction) });
+      return response({ png, overlay: { ...overlay(d, clip, p.frame, p.direction), artwork } });
     }
     if (path === '/api/rig/drag') {
-      const p = JSON.parse(options.body),
-        ex = d.export || {},
-        sc = ex.scale || 3,
-        o = ex.origin || [48, 88],
-        a = (p.direction * Math.PI) / 180,
-        x = (p.screen[0] - o[0]) / sc,
-        y = (o[1] - p.screen[1]) / sc,
-        z = p.depth,
-        world = [
-          Math.cos(a) * x - Math.sin(a) * z,
-          y,
-          Math.sin(a) * x + Math.cos(a) * z,
-        ];
-      if (p.kind === 'joint' && p.mode === 'rest') {
-        const b = d.rig.bones[p.name];
-        if (!b) throw new ProjectError(`unknown bone '${p.name}'`);
-        if (b.parent) {
-          const worldTransforms = pose(d);
-          const parentMat = worldTransforms[b.parent];
-          if (parentMat) {
-            const inv = inverseRigid(parentMat);
-            const local = mv(inv, world);
-            b.translation = [local[0], local[1], local[2]];
-          } else {
-            b.translation = [world[0], world[1], world[2]];
-          }
-        } else {
-          b.translation = [world[0], world[1], world[2]];
-        }
-      } else if (p.kind === 'target' || p.kind === 'pole') {
-        const keys =
-          (((d.animations[p.clip].ik ??= {})[p.name] ??= {})[p.kind] ??= []);
-        const k = keys.find((q: any) => q.frame === p.frame),
-          value = world;
-        k
-          ? (k.value = value)
-          : keys.push({ frame: p.frame, value, interpolation: 'linear' });
-        keys.sort((a: any, b: any) => a.frame - b.frame);
-      }
+      applyRigDrag(d, JSON.parse(options.body));
       validateProject(d);
 
       return response({ document: d });

@@ -114,26 +114,26 @@ parts:
     - 0
     - 1.5
     front: |
-      .rr.
-      rrrr
-      rrrr
-      rrrr
-      rrrr
       .ss.
+      rrrr
+      rrrr
+      rrrr
+      rrrr
+      .rr.
     back: |
-      .rr.
-      rrrr
-      rrrr
-      rrrr
-      rrrr
       .ss.
+      rrrr
+      rrrr
+      rrrr
+      rrrr
+      .rr.
     side: |
-      .rr.
-      rrrr
-      rrrr
-      rrrr
-      rrrr
       .ss.
+      rrrr
+      rrrr
+      rrrr
+      rrrr
+      .rr.
   upper_leg:
     pivot:
     - 2

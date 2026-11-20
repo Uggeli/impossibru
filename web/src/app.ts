@@ -1,4 +1,5 @@
 import './style.css';
+import { renderOverlay, type PoseControl, type PoseTool } from './rigoverlay';
 import { offersSilhouetteSync, paletteCharError, partKeyDisplay } from './editorrules';
 import { load as parseYaml } from 'js-yaml';
 import { activeParts, validateProject } from './engine';
@@ -1347,13 +1348,21 @@ function updateHandleVisibility() {
 }
 
 function setWorkspace(name: string) {
-  if (name !== state.workspace) stopPlayback();
+  if (name !== state.workspace) {
+    stopPlayback();
+    cancelRigDrag?.();
+    ++previewSequence;
+    poseTool = 'select';
+    state.overlay = null;
+    $('rigOverlay').replaceChildren();
+  }
   state.workspace = name;
   updateHandleVisibility();
   document.querySelectorAll<HTMLElement>('[data-workspace]').forEach(b => b.classList.toggle('active', b.dataset.workspace === name));
   document.querySelectorAll('[data-pane=parts]').forEach(e => e.classList.toggle('hidden', name !== 'parts'));
   document.querySelectorAll('[data-pane=rigging]').forEach(e => e.classList.toggle('hidden', name === 'parts'));
-  $('rigBonesSection').classList.toggle('hidden', name === 'animate');
+  $('rigBonesSection').classList.toggle('animate', name === 'animate');
+  updatePoseTools();
   $('clipSection').classList.toggle('hidden', name !== 'animate');
   $('timeline').classList.toggle('hidden', name !== 'animate');
   $('rigModeTitle').textContent = name === 'animate' ? 'Animate' : 'Rest pose';
@@ -1467,7 +1476,7 @@ function putKey(group: string, name: string, track: string, value: any) {
   keys.sort((a: any, b: any) => a.frame - b.frame);
 }
 
-function renderRig() {
+function renderRig(refreshPreview = true) {
   if (!state.doc) return;
   const tree = $('boneTree');
   tree.replaceChildren();
@@ -1507,7 +1516,7 @@ function renderRig() {
   renderClipTiming();
   renderProceduralInspector();
   renderTimeline();
-  if (state.workspace !== 'parts' && state.valid) updateRigPreview();
+  if (refreshPreview && state.workspace !== 'parts' && state.valid) updateRigPreview();
 }
 
 function renderBoneInspector() {
@@ -2596,7 +2605,7 @@ async function handleAutoRig() {
     renderRig();
     renderTimeline();
     if (state.valid) {
-      await updateRigPreview(true);
+      await updateRigPreview();
     }
     $('status').textContent = 'Autorig complete';
   } catch (error: any) {
@@ -2899,7 +2908,7 @@ function setAnimationFrame(frameIndex: number) {
   renderBoneInspector();
   renderKeyInspector();
   schedulePreview(0);
-  if (state.workspace !== 'parts' && state.valid) updateRigPreview(true);
+  if (state.workspace !== 'parts' && state.valid) updateRigPreview();
 }
 
 function navigateKey(direction: number) {
@@ -2909,159 +2918,196 @@ function navigateKey(direction: number) {
   setAnimationFrame(next);
 }
 
-async function updateRigPreview(redraw = true) {
+let poseTool: PoseTool = 'select';
+let previewSequence = 0;
+let cancelRigDrag: (() => void) | null = null;
+
+function updatePoseTools() {
+  const animate = state.workspace === 'animate';
+  $('moveToolLabel').textContent = animate ? 'Move' : 'Move pivot';
+  document.querySelectorAll<HTMLElement>('[data-pose-tool]').forEach(button =>
+    button.setAttribute('aria-pressed', String(button.dataset.poseTool === poseTool)));
+  document.querySelector<HTMLElement>('.rig-help')!.textContent = animate
+    ? 'Drag a sleeve to swing it. Drag a joint to swing its parent.'
+    : poseTool === 'move' ? 'Drag a joint to move its pivot.' : 'Select a part or joint.';
+}
+
+function setPoseTool(tool: PoseTool) {
+  cancelRigDrag?.();
+  poseTool = tool;
+  updatePoseTools();
+  drawOverlay();
+}
+
+function drawOverlay() {
+  if (state.overlay) renderOverlay($('rigOverlay'), state.overlay, state.workspace === 'animate',
+    poseTool, state.selectedBone, state.selectedChain, state.selectedTrack, beginRigDrag, selectControl);
+}
+
+function selectControl(action: PoseControl) {
+  if (action.bone) {
+    state.selectedBone = action.bone;
+    for (let p = state.doc.rig.bones[action.bone].parent; p; p = state.doc.rig.bones[p].parent) collapsedBones.delete(p);
+  }
+  const ik = action.kind === 'target' || action.kind === 'pole';
+  state.selectedChain = ik ? action.name : null;
+  state.selectedTrack = ik ? action.kind : action.kind === 'joint' ? 'translation' : 'rotation';
+  renderRig(false);
+  drawOverlay();
+}
+
+function rigContext() {
+  return { mode: state.workspace === 'animate' ? 'animate' : 'rest', clip: state.selectedClip,
+    frame: +$('frame').value, direction: +$('yaw').value };
+}
+
+async function updateRigPreview(doc = state.doc) {
   if (!state.valid || state.workspace === 'parts') return;
-  const payload = {
-    document: state.doc,
-    mode: state.workspace === 'animate' ? 'animate' : 'rest',
-    clip: state.selectedClip,
-    frame: +$('frame').value,
-    direction: +$('yaw').value,
-    mutedTracks: Array.from(state.mutedTracks)
-  };
+  const sequence = ++previewSequence;
+  const img = $('rigImage');
+  const context = rigContext();
+  // A slow preview must never leave pickable artwork from another frame or view.
+  if (!state.playing && state.overlay && (img.dataset.mode !== context.mode ||
+      img.dataset.clip !== context.clip || Number(img.dataset.frame) !== context.frame ||
+      Number(img.dataset.direction) !== context.direction)) {
+    state.overlay = null;
+    $('rigOverlay').replaceChildren();
+  }
+  const payload = { document: doc, ...context, mutedTracks: Array.from(state.mutedTracks) };
   try {
     const body = await (await request('/api/rig/preview', { method: 'POST', body: JSON.stringify(payload) })).json();
-    const img = $('rigImage');
+    if (sequence !== previewSequence || state.workspace === 'parts') return;
+    Object.assign(img.dataset, context);
     img.src = 'data:image/png;base64,' + body.png;
     img.dataset.rendered = 'true';
     state.overlay = body.overlay;
-    if (redraw) drawOverlay();
+    drawOverlay();
   } catch (error: any) {
+    if (sequence !== previewSequence) return;
     $('rigErrorBanner').textContent = error.message;
     $('rigErrorBanner').classList.remove('hidden');
   }
 }
 
-function drawOverlay() {
-  const svg = $('rigOverlay'), g = state.overlay;
-  if (!g) return;
-  svg.setAttribute('viewBox', `0 0 ${g.width} ${g.height}`);
-  svg.replaceChildren();
-  const byName = Object.fromEntries(g.bones.map((b: any) => [b.name, b])), chainLinks: Record<string, string> = {};
-  g.chains.forEach((c: any) => { chainLinks[c.mid] = c.color; chainLinks[c.end] = c.color; });
-  g.bones.forEach((b: any) => {
-    if (!b.parent) return;
-    const p = byName[b.parent], line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    line.setAttribute('x1', String(p.x));
-    line.setAttribute('y1', String(p.y));
-    line.setAttribute('x2', String(b.x));
-    line.setAttribute('y2', String(b.y));
-    line.setAttribute('class', 'rig-link' + (chainLinks[b.name] ? ' chain' : ''));
-    if (chainLinks[b.name]) line.setAttribute('stroke', chainLinks[b.name]);
-    svg.append(line);
-  });
-  g.chains.forEach((c: any) => {
-    [c.target, c.pole].forEach((h: any, i: number) => {
-      if (!h) return;
-      const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-      circle.setAttribute('cx', String(h.x));
-      circle.setAttribute('cy', String(h.y));
-      circle.setAttribute('r', String(i ? 2 : 2.5));
-      circle.setAttribute('fill', c.color);
-      circle.setAttribute('class', 'rig-handle');
-      circle.onclick = () => {
-        state.selectedChain = c.name;
-        state.selectedTrack = i ? 'pole' : 'target';
-        renderRig();
-      };
-      bindRigDrag(circle, i ? 'pole' : 'target', c.name, h.depth);
-      svg.append(circle);
-    });
-  });
-  g.bones.forEach((b: any) => {
-    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    circle.setAttribute('cx', String(b.x));
-    circle.setAttribute('cy', String(b.y));
-    circle.setAttribute('r', String(b.name === state.selectedBone ? 2.3 : 1.7));
-    circle.setAttribute('class', 'rig-joint' + (b.name === state.selectedBone ? ' selected' : ''));
-    circle.onclick = () => {
-      state.selectedBone = b.name;
-      for (let parent = state.doc.rig.bones[b.name].parent; parent; parent = state.doc.rig.bones[parent].parent) collapsedBones.delete(parent);
-      state.selectedChain = null;
-      renderRig();
-    };
-    bindRigDrag(circle, 'joint', b.name, b.depth);
-    svg.append(circle);
-    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    text.setAttribute('x', String(b.x + 2.5));
-    text.setAttribute('y', String(b.y - 2));
-    text.setAttribute('class', 'rig-label');
-    text.textContent = b.name;
-    text.classList.toggle('selected', b.name === state.selectedBone);
-    circle.setAttribute('tabindex', '0');
-    circle.setAttribute('role', 'button');
-    circle.setAttribute('aria-label', b.name);
-    circle.onkeydown = event => {
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
-        event.stopPropagation();
-        circle.dispatchEvent(new MouseEvent('click'));
-      }
-    };
-    circle.onfocus = () => text.classList.add('focused');
-    circle.onblur = () => text.classList.remove('focused');
-    svg.append(text);
-  });
-}
+function beginRigDrag(down: PointerEvent, action: PoseControl) {
+  if (down.button !== 0 || !down.isPrimary || cancelRigDrag || !state.valid) return;
+  down.preventDefault();
+  if (state.playing) {
+    stopPlayback();
+    // Freeze the frame the user actually grabbed, including on a slow local renderer.
+    setAnimationFrame(Number($('rigImage').dataset.frame));
+  }
+  const svg = $('rigOverlay') as SVGSVGElement;
+  const inverse = svg.getScreenCTM()?.inverse();
+  if (!inverse) return;
+  const offset = state.overlay.offset || [0, 0];
+  const toScreen = (e: PointerEvent) => {
+    const p = new DOMPoint(e.clientX, e.clientY).matrixTransform(inverse);
+    return [p.x - offset[0], p.y - offset[1]];
+  };
+  const start = toScreen(down);
+  const context = rigContext(), original = state.doc, revision = state.revision;
+  selectControl(action);
+  if (action.kind === 'select') return;
 
-function bindRigDrag(element: SVGElement, kind: string, name: string, depth: number) {
-  element.onpointerdown = e => {
-    e.preventDefault();
-    e.stopPropagation();
-    const pointerId = e.pointerId, dragStart = structuredClone(state.doc);
-    element.setPointerCapture(pointerId);
-    let moved = false;
-    let pending = false, latest: any = null;
-    const apply = async () => {
-      if (pending || !latest) return;
-      pending = true;
-      const screen = latest;
-      latest = null;
-      try {
-        const body = await (await request('/api/rig/drag', { method: 'POST', body: JSON.stringify({ document: dragStart, kind, name, screen, depth, direction: +$('yaw').value, mode: state.workspace === 'animate' ? 'animate' : 'rest', clip: state.selectedClip, frame: +$('frame').value }) })).json();
-        state.doc = body.document;
-        state.dirty = true;
-        state.valid = true;
-        renderBoneInspector();
-        renderTimeline();
-        await updateRigPreview(false);
-      } catch (error: any) {
-        showError(error.message);
-      } finally {
-        pending = false;
-        if (latest) apply();
-      }
-    };
-    element.onpointermove = move => {
-      if (!element.hasPointerCapture(move.pointerId)) return;
-      if (!moved) checkpoint();
-      moved = true;
-      const matrix = $('rigOverlay').getScreenCTM();
-      if (!matrix) return;
-      const point = new DOMPoint(move.clientX, move.clientY).matrixTransform(matrix.inverse());
-      const screen = [point.x, point.y];
-      latest = [screen[0] - (state.overlay.offset?.[0] || 0), screen[1] - (state.overlay.offset?.[1] || 0)];
-      element.setAttribute('cx', String(screen[0]));
-      element.setAttribute('cy', String(screen[1]));
-      apply();
-    };
-    const finish = async () => {
-      element.onpointermove = null;
-      element.onpointerup = null;
-      element.onpointercancel = null;
-      if (element.hasPointerCapture(pointerId)) element.releasePointerCapture(pointerId);
-      if (!moved) return;
-      while (pending || latest) await new Promise(resolve => setTimeout(resolve, 10));
+  svg.setPointerCapture(down.pointerId);
+  let moved = false, released = false, pending = false;
+  let latest: number[] | null = null;
+  let lastX = down.clientX, lastY = down.clientY;
+  let draft: typeof original = null;
+  const sameView = () => context.clip === state.selectedClip && context.frame === +$('frame').value &&
+    context.direction === +$('yaw').value && state.workspace === (context.mode === 'rest' ? 'rig' : 'animate');
+  const current = () => cancelRigDrag === cancelWhileHeld && state.doc === original &&
+    revision === state.revision && (released || sameView());
+
+  function cancelWhileHeld() {
+    if (!released) cancel();
+  }
+
+  function cleanup() {
+    svg.onpointermove = svg.onpointerup = svg.onpointercancel = svg.onlostpointercapture = null;
+    if (svg.hasPointerCapture(down.pointerId)) svg.releasePointerCapture(down.pointerId);
+    cancelRigDrag = null;
+  }
+  function cancel() {
+    cleanup();
+    ++previewSequence;
+    void updateRigPreview();
+  }
+  function commit() {
+    cleanup();
+    if (draft) {
+      checkpoint();
+      state.doc = draft;
       changed();
-      await updateRigPreview(true);
-    };
-    element.onpointerup = finish;
-    element.onpointercancel = finish;
+      // Both drag endpoints have already validated the document. The next sleeve is ready to grab.
+      state.valid = true;
+      updateButtons();
+    }
+  }
+  async function apply() {
+    if (pending) return;
+    pending = true;
+    try {
+      while (latest && current()) {
+        const screen = latest;
+        latest = null;
+        const payload = { document: original, ...context, kind: action.kind, name: action.name,
+          depth: action.point.depth, screen, start };
+        const body = await (await request('/api/rig/drag', { method: 'POST', body: JSON.stringify(payload) })).json();
+        if (!current()) break;
+        draft = body.document;
+        if (sameView() && (!released || !latest)) await updateRigPreview(draft);
+      }
+      if (cancelRigDrag !== cancelWhileHeld) return;
+      if (!current()) cancel();
+      else if (released) commit();
+    } catch (error: any) {
+      if (cancelRigDrag === cancelWhileHeld) {
+        cancel();
+        showError(error.message);
+      }
+    } finally {
+      pending = false;
+    }
+  }
+  function queue(e: PointerEvent) {
+    if (e.pointerId !== down.pointerId) return;
+    if (!moved && Math.hypot(e.clientX - down.clientX, e.clientY - down.clientY) < 3) return;
+    if (!moved && action.kind === 'rotate' && action.bone !== action.name) {
+      selectControl({ ...action, bone: action.name });
+    }
+    moved = true;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    const screen = toScreen(e);
+    if (action.kind !== 'rotate') {
+      // Preserve the grab offset when moving by artwork or by an arrow shaft.
+      screen[0] = action.point.x - offset[0] + (action.axis === 'y' ? 0 : screen[0] - start[0]);
+      screen[1] = action.point.y - offset[1] + (action.axis === 'x' ? 0 : screen[1] - start[1]);
+    }
+    latest = screen;
+    void apply();
+  }
+  cancelRigDrag = cancelWhileHeld;
+  svg.onpointermove = e => { if (!released) queue(e); };
+  svg.onpointerup = e => {
+    if (e.pointerId !== down.pointerId) return;
+    released = true;
+    if (e.clientX !== lastX || e.clientY !== lastY) queue(e);
+    if (!moved) cleanup();
+    else if (!pending && current()) commit();
+    else if (!pending) cancel();
+  };
+  svg.onpointercancel = svg.onlostpointercapture = e => {
+    if (e.pointerId === down.pointerId && !released) cancel();
   };
 }
 
 // Tool Selection Handlers
 if (typeof document !== 'undefined') {
+  document.querySelectorAll<HTMLElement>('[data-pose-tool]').forEach(button =>
+    button.onclick = () => setPoseTool(button.dataset.poseTool as PoseTool));
   document.querySelectorAll<HTMLElement>('[data-tool]').forEach(button => button.onclick = () => {
     state.tool = button.dataset.tool;
     document.querySelectorAll<HTMLElement>('[data-tool]').forEach(b => b.classList.toggle('active', b === button));
@@ -3295,7 +3341,11 @@ window.addEventListener('keydown', event => {
   }
 
   const key = event.key.toLowerCase();
-  if ((event.ctrlKey || event.metaKey) && key === 's') {
+  const poseKeys: Record<string, PoseTool> = { q: 'select', w: 'move', e: 'rotate' };
+  if (state.workspace !== 'parts' && !event.ctrlKey && !event.metaKey && !event.altKey && poseKeys[key]) {
+    event.preventDefault();
+    setPoseTool(poseKeys[key]);
+  } else if ((event.ctrlKey || event.metaKey) && key === 's') {
     event.preventDefault();
     save();
   } else if ((event.ctrlKey || event.metaKey) && key === 'z') {

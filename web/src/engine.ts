@@ -992,35 +992,44 @@ export function color(
   return [v[0], v[1], v[2], v[3] ?? 255];
 }
 
-const sample = (
+function trackSegment(
   ks: Key<any>[] | undefined,
   f: number,
   loop: boolean,
   frames: number
-) => {
+): [any, any, number] | null {
   if (!ks?.length) return null;
   const exact = ks.find((k) => k.frame === f);
-  if (exact) return exact.value;
+  if (exact) return [exact.value, exact.value, 0];
   let l = [...ks].reverse().find((k) => k.frame < f),
     r = ks.find((k) => k.frame > f),
     pos = f;
   if (!l || !r) {
-    if (!loop || ks.length < 2) return (l || r)!.value;
+    if (!loop || ks.length < 2) {
+      const value = (l || r)!.value;
+      return [value, value, 0];
+    }
     if (l) r = { ...ks[0], frame: ks[0].frame + frames };
     else {
       l = { ...ks.at(-1)!, frame: ks.at(-1)!.frame - frames };
       r = ks[0];
     }
   }
-  if (l!.interpolation === 'step') return l!.value;
+  if (l!.interpolation === 'step') return [l!.value, l!.value, 0];
   let t = (pos - l!.frame) / (r!.frame - l!.frame);
   if (l!.interpolation === 'smooth') t = t * t * (3 - 2 * t);
-  const a = l!.value,
-    b = r!.value;
+  return [l!.value, r!.value, t];
+}
+
+export function sample(keys: Key<any>[] | undefined, frame: number, loop: boolean, frames: number) {
+  const segment = trackSegment(keys, frame, loop, frames);
+  if (!segment) return null;
+  const [a, b, t] = segment;
+  if (!t) return a;
   return Array.isArray(a)
     ? a.map((x: number, i: number) => x * (1 - t) + b[i] * t)
     : a * (1 - t) + b * t;
-};
+}
 
 export function activeParts(
   d: ProjectDocument,
@@ -1067,7 +1076,7 @@ export function pose(
     const isMutedT = mutedTracks?.has(`${n}.translation`) || mutedTracks?.has(n);
     const isMutedR = mutedTracks?.has(`${n}.rotation`) || mutedTracks?.has(n);
     const tSample = isMutedT ? null : (sample(tr?.translation, frame, loop, frames) as Vec3 | null);
-    const rSample = isMutedR ? null : (sample(tr?.rotation, frame, loop, frames) as Vec3 | null);
+    const rotation = isMutedR ? null : trackSegment(tr?.rotation, frame, loop, frames);
     const bt = b.translation || [0, 0, 0];
     const br = b.rotation || [0, 0, 0];
     const trans: Vec3 = [
@@ -1075,14 +1084,14 @@ export function pose(
       bt[1] + (tSample?.[1] || 0),
       bt[2] + (tSample?.[2] || 0),
     ];
-    const rotEuler: Vec3 = [
-      (br[0] || 0) + (rSample?.[0] || 0),
-      (br[1] || 0) + (rSample?.[1] || 0),
-      (br[2] || 0) + (rSample?.[2] || 0),
-    ];
-
     localT[n] = trans;
-    localR[n] = extractR3(euler(rotEuler));
+    localR[n] = extractR3(euler(br));
+    if (rotation) {
+      const [a, b, t] = rotation;
+      const left = extractR3(euler(a));
+      const keyed = t ? slerpMatrix3(left, extractR3(euler(b)), t) : left;
+      localR[n] = mul3(localR[n], keyed);
+    }
   }
 
   const computeWorld = (): Record<string, Mat> => {
@@ -1237,6 +1246,8 @@ export function voxels(d: ProjectDocument, p: string) {
   return res;
 }
 
+export type ArtworkRuns = Record<string, [number, number, number][]>;
+
 export function render(
   d: ProjectDocument,
   clip?: string,
@@ -1245,7 +1256,8 @@ export function render(
   part?: string,
   size?: number,
   mutedTracks?: Set<string>,
-  highlightSlice?: number
+  highlightSlice?: number,
+  artwork?: ArtworkRuns
 ): HTMLCanvasElement {
   const ex = d.export || {},
     w = size || ex.size?.[0] || 96,
@@ -1285,7 +1297,7 @@ export function render(
       });
     }
   } else {
-    for (const [bn, b] of targetBones) {
+    for (const [index, [bn, b]] of targetBones.entries()) {
       if (part && b.part !== part) continue;
       const drawn = active[bn];
       if (!drawn) continue;
@@ -1298,6 +1310,7 @@ export function render(
           x = c * p[0] + s * p[2],
           z = -s * p[0] + c * p[2];
         all.push({
+          owner: index + 1,
           x: origin[0] + x * scale,
           y: origin[1] - p[1] * scale,
           z,
@@ -1308,11 +1321,26 @@ export function render(
     }
   }
   all.sort((a, b) => a.z - b.z);
+  const owners = artwork ? new Uint32Array(w * h) : null;
   for (const v of all) {
     const x0 = Math.floor(v.x - scale / 2),
       y0 = Math.floor(v.y - scale / 2);
     ctx.fillStyle = `rgba(${v.c[0]},${v.c[1]},${v.c[2]},${v.c[3] / 255})`;
     ctx.fillRect(x0, y0, scale, scale);
+    if (owners && v.c[3] > 0 && x0 < w && x0 + scale > 0) {
+      for (let y = Math.max(0, y0); y < Math.min(h, y0 + scale); y++) {
+        owners.fill(v.owner, y * w + Math.max(0, x0), y * w + Math.min(w, x0 + scale));
+      }
+    }
+  }
+  if (owners && artwork) {
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w;) {
+        const start = x, id = owners[y * w + x++];
+        while (x < w && owners[y * w + x] === id) x++;
+        if (id) (artwork[targetBones[id - 1][0]] ??= []).push([y, start, x]);
+      }
+    }
   }
   // Editor slice highlight: one voxel-tall layer drawn on top.
   if (highlightSlice !== undefined) {
@@ -1333,7 +1361,7 @@ export function overlay(
 ) {
   const p = pose(d, clipName, frame, mutedTracks),
     ex = d.export || {},
-    o = ex.origin || [48, 88],
+    o = ex.origin || [(ex.size?.[0] || 96) / 2, (ex.size?.[1] || 96) - 8],
     sc = ex.scale || 3,
     a = (yaw * Math.PI) / 180,
     c = Math.cos(a),
@@ -1368,6 +1396,7 @@ export function overlay(
       };
       if (clip?.ik?.[name]) {
         const tracks = clip.ik[name];
+        item.weight = sample(tracks.weight, frame, clip.loop !== false, clip.frames) ?? 1;
         for (const kind of ['target', 'pole'] as const) {
           const val = sample(
             tracks[kind],

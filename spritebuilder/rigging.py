@@ -7,7 +7,7 @@ from typing import Any, Dict, Mapping, Optional, Tuple
 
 import numpy as np
 
-from .animation import evaluate_pose, evaluate_rest_pose, matrix4
+from .animation import evaluate_pose, evaluate_rest_pose, euler_matrix, sample_track
 from .project import Project, ProjectError, compile_project
 from .render import camera_yaw
 
@@ -66,8 +66,9 @@ def overlay_geometry(project: Project, pose: Mapping[str, np.ndarray], yaw: floa
         item = {"name": name, "root": chain.root, "mid": chain.mid, "end": chain.end,
                 "color": colors[index % len(colors)]}
         if clip is not None and name in clip.ik:
-            from .animation import sample_track
             tracks = clip.ik[name]
+            weight = sample_track(tracks.get("weight"), frame, clip.loop, clip.frames)
+            item["weight"] = float(weight) if weight is not None else 1.0
             for kind in ("target", "pole"):
                 value = sample_track(tracks.get(kind), frame, clip.loop, clip.frames)
                 if value is not None:
@@ -139,73 +140,72 @@ def set_key(keys: list, frame: int, value, interpolation="linear") -> None:
 
 def drag_document(document: Mapping[str, Any], kind: str, name: str, screen,
                   yaw: float, depth: float, mode="rest", clip_name=None,
-                  frame: int = 0, path="<memory>") -> Dict[str, Any]:
+                  frame: int = 0, path="<memory>", start=None) -> Dict[str, Any]:
     project = compile_project(document, path)
     world = unproject_point(project, screen, depth, yaw)
     result = copy.deepcopy(document)
-    if kind == "joint":
+    clip = None
+    if mode == "animate":
+        if clip_name not in project.clips:
+            raise ProjectError(f"unknown animation {clip_name!r}")
+        clip = project.clips[clip_name]
+        if not 0 <= frame < clip.frames:
+            raise ProjectError(f"frame must be in 0..{clip.frames - 1}")
+    elif mode != "rest":
+        raise ProjectError("mode must be rest or animate")
+
+    if kind in ("joint", "rotate"):
         if name not in project.bones:
             raise ProjectError(f"unknown bone {name!r}")
-        if mode == "rest":
-            parent = project.bones[name].parent
-            pose = evaluate_rest_pose(project)
-            local = np.linalg.inv(pose[parent]) @ np.r_[world, 1.0] if parent else np.r_[world, 1.0]
-            result["rig"]["bones"][name]["translation"] = [float(v) for v in local[:3]]
-        else:
-            if clip_name not in project.clips:
-                raise ProjectError(f"unknown animation {clip_name!r}")
-            clip = project.clips[clip_name]
-            if not 0 <= frame < clip.frames:
-                raise ProjectError(f"frame must be in 0..{clip.frames - 1}")
-            parent = project.bones[name].parent
-            target_bone = parent or name
-            if parent is None:
-                tracks = result["animations"][clip_name].setdefault("bones", {}).setdefault(
-                    target_bone, {})
-                value = (world - project.bones[name].translation).tolist()
-                set_key(tracks.setdefault("translation", []), frame, value)
+        pose = evaluate_pose(project, clip, frame) if clip else evaluate_rest_pose(project)
+        bone = project.bones[name]
+        if kind == "joint" and clip and bone.parent:
+            # A joint is the endpoint of the incoming segment.
+            for chain_name, chain in project.ik_chains.items():
+                tracks = clip.ik.get(chain_name, {})
+                weight = sample_track(tracks.get("weight"), frame, clip.loop, clip.frames)
+                if weight is not None and float(weight) <= 0:
+                    continue
+                if name == chain.end:
+                    kind, name = "target", chain_name
+                    break
+                if bone.parent in (chain.root, chain.mid) and tracks.get("target"):
+                    raise ProjectError(f"drag the target of IK chain {chain_name!r}")
             else:
-                from .animation import sample_track
-                for chain_name, chain in project.ik_chains.items():
-                    chain_tracks = clip.ik.get(chain_name, {})
-                    weight_v = sample_track(chain_tracks.get("weight"), frame, clip.loop, clip.frames)
-                    weight = float(weight_v) if weight_v is not None else 1.0
-                    if name == chain.end and weight > 0:
-                        ik_tracks = result["animations"][clip_name].setdefault("ik", {}).setdefault(
-                            chain_name, {})
-                        set_key(ik_tracks.setdefault("target", []), frame,
-                                [float(v) for v in world])
-                        compile_project(result, path)
-                        return result
-                    target = sample_track(chain_tracks.get("target"), frame, clip.loop, clip.frames)
-                    if parent in (chain.root, chain.mid) and target is not None and weight > 0:
-                        raise ProjectError(
-                            f"bone {parent!r} is controlled by IK chain {chain_name!r}; drag its IK target")
-                pose = evaluate_pose(project, clip, frame)
-                pivot = pose[parent][:3, 3]
-                old = pose[name][:3, 3] - pivot
-                new = world - pivot
-                camera = camera_yaw(yaw)
-                a, b = camera @ old, camera @ new
-                angle = math.degrees(math.atan2(a[0]*b[1]-a[1]*b[0], a[0]*b[0]+a[1]*b[1]))
-                current = [0.0, 0.0, 0.0]
-                existing = clip.bones.get(parent, {}).get("rotation", [])
-                sampled = sample_track(existing, frame, clip.loop, clip.frames)
-                if sampled is not None:
-                    current = sampled.tolist()
-                # Camera-normal world rotation is represented by the closest
-                # editor Euler component (front/back Z, side X).
-                axis = 0 if abs(math.sin(math.radians(yaw))) > .707 else 2
-                current[axis] = normalize_angle(current[axis] - angle)
-                tracks = result["animations"][clip_name].setdefault("bones", {}).setdefault(
-                    target_bone, {})
-                set_key(tracks.setdefault("rotation", []), frame, current)
-    elif kind in ("target", "pole"):
-        if mode != "animate" or clip_name not in project.clips or name not in project.ik_chains:
+                start = project_point(project, pose[name][:3, 3], yaw)[:2]
+                kind, name = "rotate", bone.parent
+
+    if kind in ("target", "pole"):
+        if not clip or name not in project.ik_chains:
             raise ProjectError("IK handles require an animation clip and valid chain")
         tracks = result["animations"][clip_name].setdefault("ik", {}).setdefault(name, {})
-        set_key(tracks.setdefault(kind, []), frame, [float(v) for v in world])
+        set_key(tracks.setdefault(kind, []), frame, world.tolist())
+    elif kind in ("joint", "rotate"):
+        bone = project.bones[name]
+        parent = pose[bone.parent] if bone.parent else np.eye(4)
+        if kind == "rotate":
+            if not isinstance(start, (list, tuple)) or len(start) != 2:
+                raise ProjectError("rotation requires a starting screen point")
+            pivot = project_point(project, pose[name][:3, 3], yaw)[:2]
+            old, new = np.array(start) - pivot, np.array(screen) - pivot
+            if min(np.linalg.norm(old), np.linalg.norm(new)) < 1e-7:
+                return result
+            angle = math.degrees(math.atan2(old[1]*new[0] - old[0]*new[1], old @ new))
+            camera = camera_yaw(yaw)
+            delta = camera.T @ euler_matrix([0, 0, angle]) @ camera
+            local = parent[:3, :3].T @ delta @ pose[name][:3, :3]
+            if clip:
+                local = euler_matrix(bone.rotation).T @ local
+            track, value = "rotation", euler_from_matrix(local)
+        else:
+            local = (np.linalg.inv(parent) @ np.r_[world, 1.0])[:3]
+            track, value = "translation", (local - bone.translation if clip else local).tolist()
+        if clip:
+            tracks = result["animations"][clip_name].setdefault("bones", {}).setdefault(name, {})
+            set_key(tracks.setdefault(track, []), frame, value)
+        else:
+            result["rig"]["bones"][name][track] = value
     else:
-        raise ProjectError("drag kind must be joint, target, or pole")
+        raise ProjectError("unknown rig drag kind")
     compile_project(result, path)
     return result
