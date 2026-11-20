@@ -238,11 +238,12 @@ def _surface(part: VoxelPart, shell: bool, surface_normals: bool) -> VoxelPart:
     keep = np.ones(len(cells), dtype=bool)
     if shell:
         keep[:] = False
-        for axis in range(3):
-            for step in (-1, 1):
-                offset = cells + reach
-                offset[:, axis] += step
-                keep |= grid[tuple(offset.T)] == 0
+        # Keep a voxel when any of its 26 neighbours is empty, so diagonal views cannot see through.
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                for dz in (-1, 0, 1):
+                    if dx or dy or dz:
+                        keep |= grid[cells[:, 0] + reach + dx, cells[:, 1] + reach + dy, cells[:, 2] + reach + dz] == 0
     return VoxelPart(part.name, part.positions[keep], part.colors[keep], normals[keep])
 
 
