@@ -7,7 +7,7 @@ from typing import Any, Dict, Tuple
 
 from PIL import Image
 
-from .animation import evaluate_pose
+from .animation import active_parts, evaluate_pose
 from .project import Project, ProjectError
 from .render import render_pose
 
@@ -33,7 +33,8 @@ def build_project(project: Project, output_directory: Path) -> Tuple[Path, Path]
             frames = []
             for frame in range(clip.frames):
                 x, y = frame * settings.width, row * settings.height
-                image = render_pose(project, evaluate_pose(project, clip, frame), direction)
+                image = render_pose(project, evaluate_pose(project, clip, frame), direction,
+                                    parts=active_parts(project, clip, frame))
                 atlas.alpha_composite(image, (x, y))
                 frames.append({
                     "index": frame,
@@ -65,7 +66,7 @@ def _build_trimmed(project: Project, selected_clips, output_directory: Path) -> 
         poses = [evaluate_pose(project, clip, frame) for frame in range(clip.frames)]
         for direction in settings.directions:
             for frame in range(clip.frames):
-                image = render_pose(project, poses[frame], direction)
+                image = render_pose(project, poses[frame], direction, parts=active_parts(project, clip, frame))
                 box = image.getchannel("A").getbbox() or (0, 0, 0, 0)
                 rendered.append((clip_name, direction, frame, image.crop(box) if box[2] > box[0] else None, box))
     sizes = [(box[2] - box[0], box[3] - box[1]) for *_, box in rendered]

@@ -280,7 +280,9 @@ def _keys(track: Any, label: str, frames: int, width: int) -> None:
         if not isinstance(frame, int) or frame < 0 or frame >= frames or frame <= last:
             raise ProjectError(f"{label} frames must be unique, ascending integers in 0..{frames - 1}")
         last = frame
-        if width == 1:
+        if width == 0:
+            pass
+        elif width == 1:
             try:
                 float(key["value"])
             except (TypeError, ValueError) as exc:
@@ -490,9 +492,23 @@ def compile_project(raw: Any, path: Any = "<memory>") -> Project:
             if bone_name not in bones or not isinstance(tracks, Mapping):
                 raise ProjectError(f"{label}.bones references invalid bone {bone_name!r}")
             for track_name, track in tracks.items():
-                if track_name not in ("translation", "rotation"):
+                if track_name not in ("translation", "rotation", "part"):
                     raise ProjectError(f"{label}.bones.{bone_name}: unknown track {track_name!r}")
-                _keys(track, f"{label}.bones.{bone_name}.{track_name}", frames, 3)
+                track_label = f"{label}.bones.{bone_name}.{track_name}"
+                if track_name == "part":
+                    _keys(track, track_label, frames, 0)
+                    for key in track:
+                        if "interpolation" in key:
+                            raise ProjectError(
+                                f"{track_label}[{key['frame']}].interpolation is not allowed on part keys")
+                        value = key["value"]
+                        if value is not None and not isinstance(value, str):
+                            raise ProjectError(
+                                f"{track_label}[{key['frame']}].value must be a part name or null")
+                        if value is not None and value not in parts:
+                            raise ProjectError(f"{track_label} references missing part {value!r}")
+                else:
+                    _keys(track, track_label, frames, 3)
         for chain_name, tracks in ik_tracks.items():
             if chain_name not in chains or not isinstance(tracks, Mapping):
                 raise ProjectError(f"{label}.ik references invalid chain {chain_name!r}")

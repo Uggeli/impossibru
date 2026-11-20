@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from typing import Dict
+from typing import Dict, Optional
 
 import numpy as np
 from PIL import Image
@@ -35,13 +35,15 @@ def _conservative_pixels(projected: np.ndarray, scale: int):
 
 
 def render_pose(project: Project, pose: Dict[str, np.ndarray], direction: float,
-                size=None, origin=None) -> Image.Image:
+                size=None, origin=None,
+                parts: Optional[Dict[str, Optional[str]]] = None) -> Image.Image:
     positions, colors, normals = [], [], []
     for name in project.bone_order:
         bone = project.bones[name]
-        if not bone.part:
+        part_name = parts.get(name, bone.part) if parts is not None else bone.part
+        if not part_name:
             continue
-        part = project.parts[bone.part]
+        part = project.parts[part_name]
         attachment = matrix4(euler_matrix(bone.part_rotation), bone.part_translation)
         transform = pose[name] @ attachment
         positions.append((transform[:3, :3] @ part.positions.T).T + transform[:3, 3])

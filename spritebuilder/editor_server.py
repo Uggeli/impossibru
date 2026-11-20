@@ -14,7 +14,7 @@ from typing import Any, Dict
 from urllib.parse import urlparse
 import webbrowser
 
-from .animation import evaluate_pose, evaluate_rest_pose
+from .animation import active_parts, evaluate_pose, evaluate_rest_pose
 from .autorig import autorig_document_data
 from .exporter import build_project
 from .document import (EditableDocument, SaveConflict, create_document, load_document,
@@ -170,7 +170,8 @@ def _handler(session: EditorSession):
                         if frame < 0 or frame >= clip.frames:
                             raise ProjectError(f"frame must be in 0..{clip.frames - 1}")
                         proc_override = payload.get("procedural")
-                        image = render_pose(project, evaluate_pose(project, clip, frame, procedural_overrides=proc_override), direction)
+                        image = render_pose(project, evaluate_pose(project, clip, frame, procedural_overrides=proc_override), direction,
+                                            parts=active_parts(project, clip, frame))
                     output = BytesIO()
                     image.save(output, format="PNG")
                     content = output.getvalue()
@@ -210,7 +211,8 @@ def _handler(session: EditorSession):
                     viewport_offset = (project.export.width / 2, project.export.height / 2)
                     viewport_origin = (project.export.origin[0] + viewport_offset[0],
                                        project.export.origin[1] + viewport_offset[1])
-                    image = render_pose(project, pose, direction, viewport_size, viewport_origin)
+                    image = render_pose(project, pose, direction, viewport_size, viewport_origin,
+                                        parts=active_parts(project, clip, frame))
                     output = BytesIO()
                     image.save(output, format="PNG")
                     self._json(200, {

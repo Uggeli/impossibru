@@ -139,6 +139,27 @@ def sample_track(keys, frame: int, loop: bool, frames: int):
     return np.asarray(left["value"], float) * (1 - t) + np.asarray(right["value"], float) * t
 
 
+def active_parts(project: Project, clip: Optional[Clip], frame: int) -> Dict[str, Optional[str]]:
+    """Part drawn by each bone at a frame; part keys are step-sampled, None hides the bone.
+
+    Before the first key the rig part is used, unless the clip loops and the track has more than
+    one key, in which case the last key wraps around.
+    """
+    result: Dict[str, Optional[str]] = {name: project.bones[name].part for name in project.bone_order}
+    if clip is None:
+        return result
+    for name, tracks in clip.bones.items():
+        keys = tracks.get("part") if isinstance(tracks, Mapping) else None
+        if not keys or name not in result:
+            continue
+        if frame < keys[0]["frame"] and not (clip.loop and len(keys) > 1):
+            continue
+        left, _, _ = _track_segment([dict(k, interpolation="step") for k in keys],
+                                    frame, clip.loop, clip.frames)
+        result[name] = left["value"]
+    return result
+
+
 def sample_rotation(keys, frame: int, loop: bool, frames: int) -> np.ndarray:
     left, right, t = _track_segment(keys, frame, loop, frames)
     if left is None:
