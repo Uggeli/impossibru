@@ -89,3 +89,41 @@ test('resizing depth keeps the voxel count', async ({ page }) => {
   expect(head.size).toEqual([29, 21, 26]);
   expect(count(head.voxels)).toBe(before);
 });
+
+test('resize centres voxels in X/Z, keeps them at the bottom and shifts the pivot', async ({ page }) => {
+  await openQio(page);
+  const orig = (await stored(page)).parts.head;
+  const [w, h, d] = orig.size as number[];
+  const old = decode(orig.voxels);
+  await page.locator('#partWidth').fill('32');
+  await page.locator('#partDepth').fill('26');
+  await page.locator('#resizePart').click();
+  await page.waitForTimeout(300);
+  const head = (await stored(page)).parts.head;
+  expect(head.size).toEqual([32, h, 26]);
+  const ox = Math.floor((32 - w) / 2), oz = Math.floor((26 - d) / 2);
+  const next = decode(head.voxels);
+  expect(next.length).toBe(32 * h * 26);
+  let checked = 0;
+  for (let y = 0; y < h; y++) for (let z = 0; z < d; z++) for (let x = 0; x < w; x++) {
+    const c = old[x + z * w + y * w * d];
+    if (c === '.') continue;
+    expect(next[(x + ox) + (z + oz) * 32 + y * 32 * 26]).toBe(c);
+    checked++;
+  }
+  expect(checked).toBeGreaterThan(0);
+  expect(next.filter(c => c !== '.').length).toBe(checked);
+  expect(head.pivot).toEqual([orig.pivot[0] + ox, orig.pivot[1], orig.pivot[2] + oz]);
+});
+
+test('deleting a palette char used by a grid part is blocked', async ({ page }) => {
+  await openQio(page);
+  const before = await stored(page);
+  await page.locator('#paletteEditor .swatch-delete').click();
+  await expect(page.locator('#modalOverlay')).toContainText('still used');
+  await page.locator('#modalConfirmButton').click();
+  await page.waitForTimeout(300);
+  const after = await stored(page);
+  expect(Object.keys(after.palette)).toEqual(Object.keys(before.palette));
+  expect(after.parts.head.voxels).toBe(before.parts.head.voxels);
+});
