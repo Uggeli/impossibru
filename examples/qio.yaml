@@ -149,7 +149,7 @@ parts:
     - 7.0
     - 7.0
     - 0.0
-    voxels: 66.4m39.k5.k8.k5.k22.3k3.k15.2k48.
+    voxels: 66.4m39.k5.k8.k5.k22.3k3.k15.k49.
   face_surprised:
     size:
     - 15
@@ -159,7 +159,7 @@ parts:
     - 7.0
     - 7.0
     - 0.0
-    voxels: 37.m13.mtm13.m9.2p7.2p20.3k3.3k6.3k3.3k6.w2k3.w2k21.3k3.3k48.
+    voxels: 37.m13.mtm13.m9.2p7.2p20.3k3.3k6.3k3.3k6.w2k3.w2k22.2k3.2k49.
   face_content:
     size:
     - 15
@@ -179,7 +179,7 @@ parts:
     - 7.0
     - 7.0
     - 0.0
-    voxels: 65.m.m.m11.m.m9.3k3.3k6.3k3.3k6.3k3.3k6.w2k3.w2k21.2k5.2k8.k3.k35.
+    voxels: 65.m.m.m11.m.m9.3k3.3k6.3k3.3k6.3k3.3k6.w2k3.w2k22.k5.k9.k3.k35.
   fx_question:
     size:
     - 5
@@ -259,7 +259,7 @@ rig:
       translation:
       - 0
       - 9
-      - 8
+      - 7.5
       part: face_happy
     fx_question:
       parent: head
@@ -1015,9 +1015,9 @@ animations:
           interpolation: smooth
         - frame: 4
           value:
-          - -114.2
+          - -101.3
           - 0
-          - 7.8
+          - 8.4
           interpolation: smooth
       right_arm:
         rotation:
@@ -1029,9 +1029,20 @@ animations:
           interpolation: smooth
         - frame: 4
           value:
-          - -111.8
+          - -92.9
           - 0
-          - 13.1
+          - 19.3
+          interpolation: smooth
+      tablet:
+        rotation:
+        - frame: 0
+          value: *id003
+          interpolation: smooth
+        - frame: 4
+          value:
+          - -45
+          - 110
+          - 0
           interpolation: smooth
       head:
         rotation:
@@ -1807,7 +1818,7 @@ animations:
         - frame: 4
           value:
           - -6.6000000000000005
-          - 12
+          - -6
           - -4
           interpolation: smooth
       face:
@@ -1908,7 +1919,7 @@ animations:
         - frame: 4
           value:
           - -0.30000000000000004
-          - 12
+          - -6
           - -4
           interpolation: smooth
       face:
@@ -2009,7 +2020,7 @@ animations:
         - frame: 4
           value:
           - 6.0
-          - 12
+          - -6
           - -4
           interpolation: smooth
       face:
@@ -2113,7 +2124,7 @@ animations:
         - frame: 4
           value:
           - -6.6000000000000005
-          - -12
+          - 6
           - 4
           interpolation: smooth
       face:
@@ -2214,7 +2225,7 @@ animations:
         - frame: 4
           value:
           - -0.30000000000000004
-          - -12
+          - 6
           - 4
           interpolation: smooth
       face:
@@ -2315,7 +2326,7 @@ animations:
         - frame: 4
           value:
           - 6.0
-          - -12
+          - 6
           - 4
           interpolation: smooth
       face:

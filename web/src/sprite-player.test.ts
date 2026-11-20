@@ -92,6 +92,15 @@ describe('createController', () => {
     expect(at(q, calls, 0).angle).toBe(45);
   });
 
+  it('draw() without now uses the current time instead of crashing', () => {
+    const { sprite, calls } = fakeSprite();
+    const q = createController(sprite);
+    q.draw({}, { x: 0, y: 0 });
+    q.draw({}, { x: 0, y: 0 });
+    expect(Number.isFinite(calls[1].elapsedMs)).toBe(true);
+    expect(calls[1].elapsedMs).toBeGreaterThanOrEqual(0);
+  });
+
   it('rejects unknown clips by name', () => {
     const { sprite } = fakeSprite(false);
     const q = createController(sprite);

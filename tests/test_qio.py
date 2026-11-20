@@ -191,6 +191,28 @@ class QioTests(unittest.TestCase):
         steps = [b - a for a, b in zip(ys, ys[1:])]
         self.assertTrue(all(0 < d < 180 for d in steps), steps)
 
+    def test_present_shows_tablet_screen_to_viewer(self):
+        _, project = load()
+        clip = project.clips["present"]
+        last = clip.frames - 1
+        pose = evaluate_pose(project, clip, last)
+        parts = active_parts(project, clip, last)
+        a = np.asarray(render_pose(project, pose, 0, parts=parts))
+        b = np.asarray(render_pose(project, pose, 0, parts={**parts, "tablet": None}))
+        self.assertGreater(int((a != b).any(axis=2).sum()), 200)
+
+    def test_face_never_outside_head_outline(self):
+        _, project = load()
+        for name in project.export.animations:
+            clip = project.clips[name]
+            for f in range(clip.frames):
+                pose = evaluate_pose(project, clip, f)
+                parts = active_parts(project, clip, f)
+                for yaw in project.export.directions:
+                    a = np.asarray(render_pose(project, pose, yaw, parts=parts))[:, :, 3] > 0
+                    b = np.asarray(render_pose(project, pose, yaw, parts={**parts, "face": None}))[:, :, 3] > 0
+                    self.assertEqual(int((a & ~b).sum()), 0, (name, f, yaw))
+
     def test_qio_shell_enabled(self):
         raw, _ = load()
         self.assertIs(raw["export"]["shell"], True)

@@ -57,7 +57,7 @@ export function createController(sprite, { idle = 'idle', angle = 0, pointYaw = 
       angle = pointYaw[side];
       set(clip, 'hold');
     },
-    draw(ctx, { x, y, scale = 1, now }) {
+    draw(ctx, { x, y, scale = 1, now = performance.now() }) {
       if (state.start === null) state.start = now;
       if (state.mode === 'once' && now - state.start >= duration(state.clip)) {
         state = { clip: state.then, mode: 'loop', then: null, start: now };

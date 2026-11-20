@@ -123,7 +123,7 @@ def head():
 
 FACES = ("happy", "blink", "wink", "excited", "thinking", "surprised", "content", "worried")
 FACE_SIZE = 15  # sticker grid, centred on the face disc
-FACE_OFFSET = [0, 9, 8]  # face bone in head space: disc centre, one voxel in front of the disc
+FACE_OFFSET = [0, 9, 7.5]  # face bone in head space: disc centre, half a voxel in front of the disc
 
 
 def face(name: str):
@@ -199,7 +199,7 @@ def face(name: str):
 
     def paint(x, y, z):
         dx, dy = x - half, y - half
-        if dx * dx + dy * dy >= 42:  # stay on the disc
+        if dx * dx + dy * dy >= 30:  # stay well inside the disc (sticker sits a voxel proud of it)
             return None
         for i, cx_ in enumerate((-ex, ex)):
             c = eyes[i](dx - cx_, dy)
@@ -442,8 +442,10 @@ def assistant_clips():
         }},
         "present": {"frames": 10, "fps": 10, "loop": False, "bones": {
             "root": {"translation": [key(0, zero), key(2, [0, -0.8, 0]), key(4, [0, 1.2, 0]), key(6, zero)]},
-            "left_arm": {"rotation": [key(0, TABLET_ARM), key(4, aim(0.15, 0.45, 1))]},
-            "right_arm": {"rotation": [key(0, [0, 0, -4]), key(4, aim(0.25, 0.4, 1))]},
+            "left_arm": {"rotation": [key(0, TABLET_ARM), key(4, aim(0.15, 0.2, 1))]},
+            "right_arm": {"rotation": [key(0, [0, 0, -4]), key(4, aim(0.35, 0.05, 1))]},
+            # turn the tablet's screen (its +-X face) toward the viewer
+            "tablet": {"rotation": [key(0, zero), key(4, [-45, 110, 0])]},
             "head": {"rotation": [key(0, zero), key(4, [6, 0, 4])]},
             "face": {"part": [part_key(0, "face_happy"), part_key(3, "face_excited")]},
             "fx_stars": {"part": show([(3, 10)], "fx_stars", 10)},
@@ -525,7 +527,7 @@ def point_clips():
                                # reach: shoulder slides forward/out so the hand clears the big head
                                "translation": [key(0, zero), key(4, [sx * 1, 1, 2.5])]},
                 f"{other}_arm": {"rotation": [key(0, other_rest)]},
-                "head": {"rotation": [key(0, zero), key(4, [-6 * dy, sx * 12, -sx * 4])]},
+                "head": {"rotation": [key(0, zero), key(4, [-6 * dy, -sx * 6, -sx * 4])]},  # face eases back toward the viewer
                 "face": {"part": [part_key(0, "face_happy"), part_key(3, "face_wink"), part_key(5, "face_happy")]},
                 "antenna": {"rotation": [key(0, zero), key(3, [0, 0, -sx * 14]), key(6, [0, 0, sx * 6]), key(7, zero)]},
             }}
