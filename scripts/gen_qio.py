@@ -419,7 +419,7 @@ def assistant_clips():
             "right_arm": {"rotation": [key(0, [0, 0, -25]), key(4, [0, 0, -35])]},
             "head": {"rotation": [key(0, [0, 0, -2]), key(4, [0, 0, 2])]},
             "antenna": {"rotation": [key(0, [-10, 0, 0]), key(4, [10, 0, 0])]},
-            "fx_swirl": {"rotation": [key(0, zero, lin), key(7, [0, 315, 0], lin)],
+            "fx_swirl": {"rotation": [key(f, [0, f * 45, 0], lin) for f in (0, 2, 4, 6)],
                          "part": [part_key(0, "fx_swirl")]},
         }},
         "listen": {"frames": 8, "fps": 8, "loop": True, "bones": {

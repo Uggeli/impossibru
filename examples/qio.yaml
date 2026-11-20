@@ -762,7 +762,7 @@ animations:
       left_arm:
         rotation:
         - frame: 0
-          value: &id003
+          value: &id002
           - -55
           - 0
           - 0
@@ -812,15 +812,27 @@ animations:
       fx_swirl:
         rotation:
         - frame: 0
-          value: &id002
+          value:
           - 0
           - 0
           - 0
           interpolation: linear
-        - frame: 7
+        - frame: 2
           value:
           - 0
-          - 315
+          - 90
+          - 0
+          interpolation: linear
+        - frame: 4
+          value:
+          - 0
+          - 180
+          - 0
+          interpolation: linear
+        - frame: 6
+          value:
+          - 0
+          - 270
           - 0
           interpolation: linear
         part:
@@ -834,7 +846,10 @@ animations:
       root:
         translation:
         - frame: 0
-          value: *id002
+          value: &id003
+          - 0
+          - 0
+          - 0
           interpolation: smooth
         - frame: 4
           value:
@@ -867,7 +882,7 @@ animations:
       left_arm:
         rotation:
         - frame: 0
-          value: *id003
+          value: *id002
           interpolation: smooth
       face:
         part:
@@ -899,7 +914,7 @@ animations:
       root:
         translation:
         - frame: 0
-          value: *id002
+          value: *id003
           interpolation: smooth
         - frame: 5
           value:
@@ -932,7 +947,7 @@ animations:
       left_arm:
         rotation:
         - frame: 0
-          value: *id003
+          value: *id002
           interpolation: smooth
       face:
         part:
@@ -941,7 +956,7 @@ animations:
       fx_question:
         translation:
         - frame: 0
-          value: *id002
+          value: *id003
           interpolation: smooth
         - frame: 5
           value:
@@ -976,7 +991,7 @@ animations:
       root:
         translation:
         - frame: 0
-          value: *id002
+          value: *id003
           interpolation: smooth
         - frame: 2
           value:
@@ -991,12 +1006,12 @@ animations:
           - 0
           interpolation: smooth
         - frame: 6
-          value: *id002
+          value: *id003
           interpolation: smooth
       left_arm:
         rotation:
         - frame: 0
-          value: *id003
+          value: *id002
           interpolation: smooth
         - frame: 4
           value:
@@ -1021,7 +1036,7 @@ animations:
       head:
         rotation:
         - frame: 0
-          value: *id002
+          value: *id003
           interpolation: smooth
         - frame: 4
           value:
@@ -1044,7 +1059,7 @@ animations:
       antenna:
         rotation:
         - frame: 0
-          value: *id002
+          value: *id003
           interpolation: smooth
         - frame: 4
           value:
@@ -1059,7 +1074,7 @@ animations:
           - 0
           interpolation: smooth
         - frame: 9
-          value: *id002
+          value: *id003
           interpolation: smooth
   confused:
     frames: 10
@@ -1069,7 +1084,7 @@ animations:
       torso:
         translation:
         - frame: 0
-          value: *id002
+          value: *id003
           interpolation: smooth
         - frame: 3
           value:
@@ -1086,7 +1101,7 @@ animations:
       left_arm:
         rotation:
         - frame: 0
-          value: *id003
+          value: *id002
           interpolation: smooth
         - frame: 3
           value:
@@ -1111,7 +1126,7 @@ animations:
       head:
         rotation:
         - frame: 0
-          value: *id002
+          value: *id003
           interpolation: smooth
         - frame: 3
           value:
@@ -1140,7 +1155,7 @@ animations:
       antenna:
         rotation:
         - frame: 0
-          value: *id002
+          value: *id003
           interpolation: smooth
         - frame: 3
           value:
@@ -1168,7 +1183,7 @@ animations:
       root:
         translation:
         - frame: 0
-          value: *id002
+          value: *id003
           interpolation: smooth
         - frame: 2
           value:
@@ -1195,12 +1210,12 @@ animations:
           - 0
           interpolation: smooth
         - frame: 11
-          value: *id002
+          value: *id003
           interpolation: smooth
       left_leg:
         rotation:
         - frame: 0
-          value: *id002
+          value: *id003
           interpolation: smooth
         - frame: 2
           value:
@@ -1221,12 +1236,12 @@ animations:
           - 0
           interpolation: smooth
         - frame: 10
-          value: *id002
+          value: *id003
           interpolation: smooth
       right_leg:
         rotation:
         - frame: 0
-          value: *id002
+          value: *id003
           interpolation: smooth
         - frame: 2
           value:
@@ -1247,12 +1262,12 @@ animations:
           - 0
           interpolation: smooth
         - frame: 10
-          value: *id002
+          value: *id003
           interpolation: smooth
       left_foot:
         rotation:
         - frame: 0
-          value: *id002
+          value: *id003
           interpolation: smooth
         - frame: 5
           value:
@@ -1261,12 +1276,12 @@ animations:
           - 0
           interpolation: smooth
         - frame: 9
-          value: *id002
+          value: *id003
           interpolation: smooth
       right_foot:
         rotation:
         - frame: 0
-          value: *id002
+          value: *id003
           interpolation: smooth
         - frame: 5
           value:
@@ -1275,12 +1290,12 @@ animations:
           - 0
           interpolation: smooth
         - frame: 9
-          value: *id002
+          value: *id003
           interpolation: smooth
       left_arm:
         rotation:
         - frame: 0
-          value: *id003
+          value: *id002
           interpolation: smooth
         - frame: 3
           value:
@@ -1295,7 +1310,7 @@ animations:
           - 62.2
           interpolation: smooth
         - frame: 11
-          value: *id003
+          value: *id002
           interpolation: smooth
       right_arm:
         rotation:
@@ -1326,7 +1341,7 @@ animations:
       head:
         rotation:
         - frame: 0
-          value: *id002
+          value: *id003
           interpolation: smooth
         - frame: 2
           value:
@@ -1341,7 +1356,7 @@ animations:
           - 0
           interpolation: smooth
         - frame: 9
-          value: *id002
+          value: *id003
           interpolation: smooth
       face:
         part:
@@ -1362,7 +1377,7 @@ animations:
       antenna:
         rotation:
         - frame: 0
-          value: *id002
+          value: *id003
           interpolation: smooth
         - frame: 2
           value:
@@ -1383,7 +1398,7 @@ animations:
           - 0
           interpolation: smooth
         - frame: 11
-          value: *id002
+          value: *id003
           interpolation: smooth
   wave:
     frames: 12
@@ -1393,7 +1408,7 @@ animations:
       root:
         translation:
         - frame: 0
-          value: *id002
+          value: *id003
           interpolation: smooth
         - frame: 6
           value:
@@ -1402,7 +1417,7 @@ animations:
           - 0
           interpolation: smooth
         - frame: 11
-          value: *id002
+          value: *id003
           interpolation: smooth
       right_arm:
         rotation:
@@ -1445,12 +1460,12 @@ animations:
       left_arm:
         rotation:
         - frame: 0
-          value: *id003
+          value: *id002
           interpolation: smooth
       head:
         rotation:
         - frame: 0
-          value: *id002
+          value: *id003
           interpolation: smooth
         - frame: 4
           value:
@@ -1465,7 +1480,7 @@ animations:
           - -5
           interpolation: smooth
         - frame: 11
-          value: *id002
+          value: *id003
           interpolation: smooth
       face:
         part:
@@ -1478,7 +1493,7 @@ animations:
       antenna:
         rotation:
         - frame: 0
-          value: *id002
+          value: *id003
           interpolation: smooth
         - frame: 3
           value:
@@ -1499,7 +1514,7 @@ animations:
           - 8
           interpolation: smooth
         - frame: 11
-          value: *id002
+          value: *id003
           interpolation: smooth
   surprised:
     frames: 10
@@ -1509,7 +1524,7 @@ animations:
       root:
         translation:
         - frame: 0
-          value: *id002
+          value: *id003
           interpolation: smooth
         - frame: 2
           value:
@@ -1538,7 +1553,7 @@ animations:
       left_arm:
         rotation:
         - frame: 0
-          value: *id003
+          value: *id002
           interpolation: smooth
         - frame: 2
           value:
@@ -1575,7 +1590,7 @@ animations:
       head:
         rotation:
         - frame: 0
-          value: *id002
+          value: *id003
           interpolation: smooth
         - frame: 2
           value:
@@ -1606,7 +1621,7 @@ animations:
       antenna:
         rotation:
         - frame: 0
-          value: *id002
+          value: *id003
           interpolation: smooth
         - frame: 2
           value:
@@ -1662,7 +1677,7 @@ animations:
       left_arm:
         rotation:
         - frame: 0
-          value: *id003
+          value: *id002
           interpolation: smooth
       right_arm:
         rotation:
@@ -1685,7 +1700,7 @@ animations:
       fx_note:
         translation:
         - frame: 0
-          value: *id002
+          value: *id003
           interpolation: smooth
         - frame: 6
           value:
@@ -1752,7 +1767,7 @@ animations:
       left_arm:
         rotation:
         - frame: 0
-          value: *id003
+          value: *id002
           interpolation: smooth
         - frame: 3
           value:
@@ -1856,7 +1871,7 @@ animations:
       left_arm:
         rotation:
         - frame: 0
-          value: *id003
+          value: *id002
           interpolation: smooth
         - frame: 3
           value:
@@ -1957,7 +1972,7 @@ animations:
       left_arm:
         rotation:
         - frame: 0
-          value: *id003
+          value: *id002
           interpolation: smooth
         - frame: 3
           value:
@@ -2088,7 +2103,7 @@ animations:
       left_arm:
         rotation:
         - frame: 0
-          value: *id003
+          value: *id002
           interpolation: smooth
       head:
         rotation:
@@ -2189,7 +2204,7 @@ animations:
       left_arm:
         rotation:
         - frame: 0
-          value: *id003
+          value: *id002
           interpolation: smooth
       head:
         rotation:
@@ -2290,7 +2305,7 @@ animations:
       left_arm:
         rotation:
         - frame: 0
-          value: *id003
+          value: *id002
           interpolation: smooth
       head:
         rotation:

@@ -183,6 +183,14 @@ class QioTests(unittest.TestCase):
                     b = np.asarray(render_pose(project, pose, yaw[side], parts=hidden))
                     self.assertGreater(int((a != b).any(axis=2).sum()), 60)
 
+    def test_swirl_spins_forward(self):
+        # rotation tracks take the shortest path, so each key step must turn less than 180 degrees
+        raw, _ = load()
+        keys = raw["animations"]["float"]["bones"]["fx_swirl"]["rotation"]
+        ys = [k["value"][1] for k in keys] + [keys[0]["value"][1] + 360]
+        steps = [b - a for a, b in zip(ys, ys[1:])]
+        self.assertTrue(all(0 < d < 180 for d in steps), steps)
+
     def test_qio_shell_enabled(self):
         raw, _ = load()
         self.assertIs(raw["export"]["shell"], True)
